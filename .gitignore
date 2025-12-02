@@ -5,7 +5,7 @@ build
 olmoearth_projects.egg-info
 rslearn.egg-info
 project_data
-
+.venv/
 
 sen1floods11_data
 dataset_floods/cache
@@ -15,3 +15,9 @@ OlmoEarth-v1-Base
 logs
 checkpoints
 *.png
+
+
+pastis_hd_target
+dataset_pastis/cache
+dataset_pastis/tiles
+dataset_pastis/windows
