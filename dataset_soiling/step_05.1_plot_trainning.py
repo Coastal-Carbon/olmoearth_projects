@@ -9,8 +9,8 @@ from pathlib import Path
 
 
 # Set the path to your metrics CSV file
-# CSV_PATH = Path("/home/wajahat/github/olmoearth_projects/logs/lightning_logs/version_11/metrics.csv")
-CSV_PATH = Path("/home/wajahat/github/olmoearth_projects/logs/lightning_logs/version_13/metrics.csv")
+# CSV_PATH = Path("logs/lightning_logs/version_11/metrics.csv")
+CSV_PATH = Path("logs/lightning_logs/version_13/metrics.csv")
 
 
 # Load metrics
