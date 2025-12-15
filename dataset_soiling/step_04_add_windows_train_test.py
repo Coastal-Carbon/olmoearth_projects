@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 N = None                      # Number of samples (None = all)
 SEED = 42
 SPLIT_RATIO = 0.8               # 80% train, 20% test
-CLOUD_COVER_THRESHOLD = 1.5     # Only entries with cloud_cover < this value
+CLOUD_COVER_THRESHOLD = 1     # Only entries with cloud_cover < this value
 BALANCED_SAMPLING = True        # Use stratified sampling by soiling index
 N_BINS = 5                      # Number of bins for balanced sampling
 MAX_WORKERS = 32                # Parallel workers
