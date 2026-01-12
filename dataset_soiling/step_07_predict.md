@@ -1,4 +1,4 @@
-### Step 10: Predict
+### Step 7: Predict
 
 Runs inference on test set.
 

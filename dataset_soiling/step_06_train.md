@@ -1,4 +1,4 @@
-### Step 9: Train
+### Step 6: Train
 
 Trains soiling prediction model.
 

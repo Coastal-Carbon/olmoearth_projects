@@ -1,16 +1,31 @@
 {
   "layers": {
     "label": {
-      "type": "vector",
+      "type": "raster",
+      "band_sets": [
+        {
+          "bands": ["B1"],
+          "dtype": "float32",
+          "nodata_value": -1
+        }
+      ],
       "data_source": {
         "name": "rslearn.data_sources.local_files.LocalFiles",
         "src_dir": "data/labels",
+        "path_template": "{name}_label.tif",
         "ingest": true
-      }
+      },
+      "resampling_method": "nearest"
     },
 
     "output": {
-      "type": "vector"
+      "type": "raster",
+      "band_sets": [
+        {
+          "bands": ["output"],
+          "dtype": "float32"
+        }
+      ]
     },
 
     "sentinel2_l2a": {

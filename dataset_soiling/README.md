@@ -15,7 +15,6 @@ dataset_soiling/
 ├── README.md
 ├── config.json
 ├── model.yaml
-├── model_per_pixel.yaml
 │
 ├── step_00_qa_check_excel_files.py
 ├── step_01_merge_excel_files.py
