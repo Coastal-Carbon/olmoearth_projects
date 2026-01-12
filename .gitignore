@@ -27,3 +27,16 @@ dataset_soiling/data
 dataset_soiling/cache
 dataset_soiling/tiles
 dataset_soiling/windows
+
+
+checkpoints_reg/
+logs_reg/
+
+dataset_soiling_reg/data
+dataset_soiling_reg/cache
+dataset_soiling_reg/tiles
+dataset_soiling_reg/windows
+
+
+.claude
+*.xlsx

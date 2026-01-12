@@ -10,14 +10,27 @@ from pathlib import Path
 
 # Set the path to your metrics CSV file
 # CSV_PATH = Path("logs/lightning_logs/version_11/metrics.csv")
-CSV_PATH = Path("logs/lightning_logs/version_13/metrics.csv")
+# CSV_PATH = Path("logs/lightning_logs/version_13/metrics.csv")
+# Load multiple metric files and merge them
+# CSV_PATHS = [
+#     Path("/home/wajahat/github/olmoearth_projects/logs/lightning_logs/version_13/metrics.csv"),
+#     Path("/home/wajahat/github/olmoearth_projects/logs/lightning_logs/version_15/metrics.csv")
+# ]
+CSV_PATHS = [
+    Path("/home/wajahat/github/olmoearth_projects/logs_reg/lightning_logs/version_4/metrics.csv"),
+]
 
+# Load and concatenate all metrics
+dfs = []
+for path in CSV_PATHS:
+    if not path.exists():
+        raise FileNotFoundError(f"Metrics file not found: {path}")
+    dfs.append(pd.read_csv(path))
 
-# Load metrics
-if not CSV_PATH.exists():
-    raise FileNotFoundError(f"Metrics file not found: {CSV_PATH}")
+df = pd.concat(dfs, ignore_index=True)
 
-df = pd.read_csv(CSV_PATH)
+# Sort by epoch to ensure proper ordering
+df = df.sort_values('epoch').reset_index(drop=True)
 
 
 # Basic summaries
@@ -76,9 +89,9 @@ axes[1].grid(alpha=0.3)
 
 
 # Save + show figure
-version = CSV_PATH.parent.name
+versions = "_".join([p.parent.name for p in CSV_PATHS])
+output_file = f"training_metrics_{versions}.png"
 
-output_file = f"training_metrics_{version}.png"
 
 plt.tight_layout()
 plt.savefig(output_file, dpi=150, bbox_inches="tight")
