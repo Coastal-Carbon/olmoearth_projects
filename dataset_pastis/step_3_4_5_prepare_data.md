@@ -1,3 +1,33 @@
+### Step 3: Prepare (fetch STAC items)
+
+Queries Planetary Computer for Sentinel-1 and Sentinel-2 imagery matching your time windows.
+
+```bash
+rslearn dataset prepare --root ./dataset_pastis --workers 32 --retry-max-attempts 5 --retry-backoff-seconds 5
+```
+
+
+### Step 4: Ingest
+
+Ingests local PASTIS-HD crop type label files into the rslearn dataset structure.
+
+```bash
+rslearn dataset ingest --root ./dataset_pastis --workers 32
+```
+
+### Step 5: Materialize (final raster stacks)
+
+Creates final georeferenced raster files for all layers.
+
+```bash
+rslearn dataset materialize --root ./dataset_pastis --workers 32 \
+  --retry-max-attempts 5 --retry-backoff-seconds 5 --ignore-errors
+```
+
+Note: make sure to have dataset_pastis/config.json
+
+
+```json
 {
   "layers": {
     "label": {
@@ -11,12 +41,13 @@
       ],
       "data_source": {
         "name": "rslearn.data_sources.local_files.LocalFiles",
-        "src_dir": "/home/wajahat/olmoearth_projects/sen1floods11_v1.5/data/LabelHand",
-        "path_template": "{name}_LabelHand.tif",
+        "src_dir": "../pastis_hd_target/TARGET",
+        "path_template": "{name}_TARGET.tif",
         "ingest": true
       },
       "resampling_method": "nearest"
     },
+
     "output": {
       "type": "raster",
       "band_sets": [
@@ -26,23 +57,14 @@
         }
       ]
     },
+
     "sentinel2_l2a": {
       "type": "raster",
       "band_sets": [
         {
           "bands": [
-            "B01",
-            "B02",
-            "B03",
-            "B04",
-            "B05",
-            "B06",
-            "B07",
-            "B08",
-            "B8A",
-            "B09",
-            "B11",
-            "B12"
+            "B01", "B02", "B03", "B04", "B05", "B06", "B07",
+            "B08", "B8A", "B09", "B11", "B12"
           ],
           "dtype": "uint16"
         }
@@ -51,14 +73,16 @@
         "name": "rslearn.data_sources.planetary_computer.Sentinel2",
         "cache_dir": "cache/planetary_computer",
         "ingest": false,
-        "duration": "5d",
-        "max_cloud_cover": 100,
+        "max_cloud_cover": 1,
         "query_config": {
-          "period_duration": "5d",
-          "max_matches": 1
+          "period_duration": "30d",
+          "max_matches": 12,
+          "space_mode": "PER_PERIOD_MOSAIC",
+          "sort_by": "eo:cloud_cover"
         }
       }
     },
+
     "sentinel1": {
       "type": "raster",
       "band_sets": [
@@ -71,12 +95,13 @@
         "name": "rslearn.data_sources.planetary_computer.Sentinel1",
         "cache_dir": "cache/planetary_computer",
         "ingest": false,
-        "duration": "5d",
         "query_config": {
-          "period_duration": "5d",
-          "max_matches": 1
+          "period_duration": "30d",
+          "max_matches": 12,
+          "space_mode": "PER_PERIOD_MOSAIC"
         }
       }
     }
   }
 }
+```

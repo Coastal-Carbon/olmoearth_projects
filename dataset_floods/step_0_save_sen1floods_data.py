@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
-# import rasterio
-# from rasterio.transform import from_bounds
 
 from hum_ai.data_engine.database.registry import get_registry
 from hum_ai.data_engine.database.session import get_session
@@ -52,9 +50,6 @@ def get_base_chip_id(chip_id: str) -> str:
     return chip_id
 
 
-# =============================================================================
-# FIXED FUNCTION: save_tiff() with band_names support
-# =============================================================================
 def save_tiff(data, path, bbox, epsg, nodata=0, band_names=None):
     """Save array as GeoTIFF with correct metadata and optional band names."""
     import rasterio
@@ -83,7 +78,6 @@ def save_tiff(data, path, bbox, epsg, nodata=0, band_names=None):
         for i in range(bands):
             dst.write(data[i], i + 1)
 
-            # NEW: set band names
             if band_names and i < len(band_names):
                 dst.set_band_description(i + 1, band_names[i])
 
@@ -112,48 +106,41 @@ class Sen1Floods11Converter:
     def _get_dataset_name(self, split: str) -> str:
         return f"Sen1Floods11-hand-{self.chip_size}-{split}"
 
-    def _to_dict(self, rows) -> Dict[str, np.ndarray]:
-        out = {}
-        for row in rows:
-            if "chip" in row and isinstance(row["chip"], np.ndarray):
-                out[row["location"]] = row["chip"]
-        return out
+    @staticmethod
+    def _to_dict(rows: List[dict]) -> Dict[str, np.ndarray]:
+        """Convert list of rows to dictionary mapping location to chip."""
+        return {row["location"]: row["chip"] for row in rows}
 
     @staticmethod
     def _extract_chip_metadata(row: dict, split: str) -> dict:
-        """Extract minimal metadata for OlmoEarth."""
-        try:
-            metadata = {
-                "timestamp": row.get("time").isoformat() if row.get("time") else None,
-                "centroid_lon": float(row.get("centroid_lon", 0.0)),
-                "centroid_lat": float(row.get("centroid_lat", 0.0)),
-                "epsg": int(row.get("epsg", 4326)),
-                "split": split
-            }
+        """Extract minimal metadata for OlmoEarth.
+        
+        Args:
+            row: Dataset row containing chip metadata
+            split: Dataset split name (train/val/test/bolivia-test)
+        
+        Returns:
+            Dictionary containing extracted metadata
+        """
+        metadata = {
+            "timestamp": row.get("time").isoformat() if row.get("time") else None,
+            "centroid_lon": float(row.get("centroid_lon", 0.0)),
+            "centroid_lat": float(row.get("centroid_lat", 0.0)),
+            "epsg": int(row.get("epsg", 4326)),
+            "split": split
+        }
 
-            if "bbox" in row and row["bbox"] is not None:
-                metadata["bbox_wkb"] = row["bbox"].hex() if isinstance(row["bbox"], bytes) else None
+        if "bbox" in row and row["bbox"] is not None:
+            metadata["bbox_wkb"] = row["bbox"].hex() if isinstance(row["bbox"], bytes) else None
 
-            return metadata
-
-        except Exception as e:
-            logger.warning(f"Failed metadata extraction: {e}")
-            return {
-                "timestamp": None,
-                "centroid_lon": 0.0,
-                "centroid_lat": 0.0,
-                "epsg": 4326,
-                "split": split
-            }
+        return metadata
 
     def _save_metadata(self, chip_metadata: Dict[str, dict], splits_dir: Path, split: str):
+        """Save chip metadata to JSON file."""
         metadata_path = splits_dir / f"{split}_metadata.json"
-        try:
-            with open(metadata_path, "w") as f:
-                json.dump(chip_metadata, f, indent=2)
-            logger.info(f"Saved metadata for {len(chip_metadata)} chips → {metadata_path}")
-        except Exception as e:
-            logger.error(f"Metadata save failed: {e}")
+        with open(metadata_path, "w") as f:
+            json.dump(chip_metadata, f, indent=2)
+        logger.info(f"Saved metadata for {len(chip_metadata)} chips → {metadata_path}")
 
     def convert_split(self, split: str, out_dir: str, max_samples: Optional[int] = None) -> List[str]:
         logger.info(f"Processing split: {split}")
@@ -193,78 +180,75 @@ class Sen1Floods11Converter:
             if max_samples is not None:
                 chip_ids = chip_ids[:max_samples]
 
+            # Create lookup dictionary for faster access
+            flood_data_by_chip_id = {row["location"]: row for row in flood_dataset}
+
             processed = []
             chip_metadata = {}
 
             for idx, chip_id in enumerate(chip_ids):
-                try:
-                    base_chip_id = get_base_chip_id(chip_id)
+                base_chip_id = get_base_chip_id(chip_id)
 
-                    # Extract metadata
-                    for row in flood_dataset:
-                        if row["location"] == chip_id:
-                            chip_metadata[base_chip_id] = self._extract_chip_metadata(row, split)
-                            meta = chip_metadata[base_chip_id]
+                # Extract metadata using lookup dictionary
+                row = flood_data_by_chip_id[chip_id]
+                chip_metadata[base_chip_id] = self._extract_chip_metadata(row, split)
+                meta = chip_metadata[base_chip_id]
 
-                            bbox = decode_bbox_wkb(meta.get("bbox_wkb"))
-                            epsg = meta.get("epsg", 4326)
+                bbox = decode_bbox_wkb(meta.get("bbox_wkb"))
+                epsg = meta.get("epsg", 4326)
 
-                            if bbox is None:
-                                bbox = (0, 0, self.chip_size, self.chip_size)
-                            if epsg is None:
-                                epsg = 4326
-                            break
+                if bbox is None:
+                    bbox = (0, 0, self.chip_size, self.chip_size)
+                if epsg is None:
+                    epsg = 4326
 
-                    # LABEL — ADD BAND NAME
+                # Save label with band name
+                save_tiff(
+                    flood[chip_id],
+                    label_dir / f"{base_chip_id}_LabelHand.tif",
+                    bbox=bbox,
+                    epsg=epsg,
+                    nodata=-1,
+                    band_names=["label"]
+                )
+
+                # Save S1 with band names ["VV", "VH"]
+                s1_id = normalize_id(chip_id, "S1Hand")
+                if s1_id in s1_vv and s1_id in s1_vh:
+                    s1_stack = np.stack([s1_vv[s1_id], s1_vh[s1_id]])
                     save_tiff(
-                        flood[chip_id],
-                        label_dir / f"{base_chip_id}_LabelHand.tif",
-                        bbox=bbox,
-                        epsg=epsg,
-                        nodata=-1,
-                        band_names=["label"]
-                    )
-
-                    # S1 — ADD BAND NAMES ["VV", "VH"]
-                    s1_id = normalize_id(chip_id, "S1Hand")
-                    if s1_id in s1_vv and s1_id in s1_vh:
-                        s1_stack = np.stack([s1_vv[s1_id], s1_vh[s1_id]])
-                        save_tiff(
-                            s1_stack,
-                            s1_dir / f"{base_chip_id}_S1Hand.tif",
-                            bbox=bbox,
-                            epsg=epsg,
-                            nodata=0,
-                            band_names=["VV", "VH"]
-                        )
-
-                    # S2 — ADD BAND NAMES FOR ALL 13 SENTINEL-2 BANDS
-                    s2_id = normalize_id(chip_id, "S2Hand")
-                    s2_stack = []
-                    for obs in self.s2_band_order:
-                        if s2_id in s2_bands[obs]:
-                            s2_stack.append(s2_bands[obs][s2_id])
-                        else:
-                            s2_stack.append(np.zeros((self.chip_size, self.chip_size), dtype=np.float32))
-
-                    s2_band_names = [
-                        "B01", "B02", "B03", "B04", "B05", "B06", "B07",
-                        "B08", "B8A", "B09", "B10", "B11", "B12"
-                    ]
-
-                    save_tiff(
-                        np.stack(s2_stack),
-                        s2_dir / f"{base_chip_id}_S2Hand.tif",
+                        s1_stack,
+                        s1_dir / f"{base_chip_id}_S1Hand.tif",
                         bbox=bbox,
                         epsg=epsg,
                         nodata=0,
-                        band_names=s2_band_names
+                        band_names=["VV", "VH"]
                     )
 
-                    processed.append(base_chip_id)
+                # Save S2 with band names for all 13 Sentinel-2 bands
+                s2_id = normalize_id(chip_id, "S2Hand")
+                s2_stack = []
+                for obs in self.s2_band_order:
+                    if s2_id in s2_bands[obs]:
+                        s2_stack.append(s2_bands[obs][s2_id])
+                    else:
+                        s2_stack.append(np.zeros((self.chip_size, self.chip_size), dtype=np.float32))
 
-                except Exception as e:
-                    logger.error(f"Failed to process chip {chip_id}: {e}")
+                s2_band_names = [
+                    "B01", "B02", "B03", "B04", "B05", "B06", "B07",
+                    "B08", "B8A", "B09", "B10", "B11", "B12"
+                ]
+
+                save_tiff(
+                    np.stack(s2_stack),
+                    s2_dir / f"{base_chip_id}_S2Hand.tif",
+                    bbox=bbox,
+                    epsg=epsg,
+                    nodata=0,
+                    band_names=s2_band_names
+                )
+
+                processed.append(base_chip_id)
 
             # Save split list
             split_map = {
