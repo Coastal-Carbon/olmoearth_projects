@@ -1,8 +1,19 @@
 # Solar Panel Soiling Prediction - Scalar Regression
 
 Scalar regression for predicting soiling index from Sentinel-2 imagery using OlmoEarth with RegressionHead.
+This is a follow-up to the per-pixel regression experiment, using a simpler scalar target per window to see whether performance improves (or degrades) and to establish a baseline for comparison.
 
 Uses parquet file from `dataset_soiling` as source data.
+
+## Key Files
+
+- `model.yaml` - Model and training config for OlmoEarth encoder + regression head.
+- `config.json` - Dataset config generated for this directory (used by rslearn).
+- `step_03_prepare.md` - STAC search instructions for Sentinel-2 items.
+- `step_04_ingest.md` - Dataset ingest steps for labels and imagery.
+- `step_05_materialize.md` - Materialization steps for windows/tiles.
+- `data/metadata/normalization.json` - Normalization params from label generation.
+- `data/metadata/train_metadata.json` - Label metadata for training/validation.
 
 ## Directory Structure
 
