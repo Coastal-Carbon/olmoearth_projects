@@ -175,6 +175,10 @@ def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
                 "properties": {},
                 "features": chunk,
             },
+            # Some recent forest loss events will not be successful due to not having
+            # enough Sentinel-2 images after the event. So we lower the threshold to
+            # 50% of windows needing to succeed.
+            "min_window_success_rate": 0.5,
         }
         url = f"{BASE_URL}/predictions"
         response = requests.post(
