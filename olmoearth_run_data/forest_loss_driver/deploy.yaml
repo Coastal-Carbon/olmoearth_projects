@@ -19,7 +19,7 @@ integrated_config:
       - "080W_20S_070W_10S.tif"
     out_fname: "placeholder"
     country_data_path: "/weka/dfive-default/rslearn-eai/artifacts/natural_earth_countries/20240830/ne_10m_admin_0_countries.shp"
-    countries: ["PE", "BR", "CO"]
+    countries: ["PE", "BR", "CO", "EC", "BO"]
     days: 120
     # Alternatives for small-scale run.
     #gcs_tiff_filenames:
