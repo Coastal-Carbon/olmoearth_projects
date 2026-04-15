@@ -18,6 +18,7 @@ dependencies = [
     "wandb>=0.21",
     "olmoearth-runner>=0.1.10",
     "olmoearth_pretrain",
+    "stackstac>=0.5.1",
 ]
 
 
