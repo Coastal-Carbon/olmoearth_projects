@@ -38,13 +38,7 @@ ORGANIZATION_ID = "f098bcba-b994-46ce-87fc-b90b14bb8338"  # Ai2 - Demo
 PROJECT_ID = (
     "2f3788b4-11bb-48ee-b379-eacccaf9734a"  # Forest Loss Driver Colombia 12 Demo
 )
-MODEL_ID = "03b0ae58-389f-4bd5-9bc9-01469afbfca3"  # OlmoEarth-v1-FT-ForestLossDriver-Base-20251208
-# BASE_URL = "https://staging.olmoearth.allenai.org/api/v1"
-# ORGANIZATION_ID = "8f51c6e0-e363-4b2d-96ca-fb9fa85e3e7e"  # Ai2 - Demo
-# PROJECT_ID = (
-#    "dff84383-e269-4340-81a5-4e1397934feb"  # Forest Loss Driver Colombia 12 Demo
-# )
-# MODEL_ID = "98c83698-e966-4075-bfc0-796ee2dd909d"  # OlmoEarth-v1-FT-ForestLossDriver-Base-20251205
+MODEL_ID = "a3c3e819-7aa9-47e9-98fa-f72449a56263"
 REQUEST_TIMEOUT = 30
 UPLOAD_TIMEOUT = 300
 
