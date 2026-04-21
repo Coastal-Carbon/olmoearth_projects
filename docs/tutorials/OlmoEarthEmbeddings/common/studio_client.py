@@ -108,18 +108,17 @@ class StudioClient:
     def poll_prediction(
         self,
         prediction_id: str,
-        poll_interval: float = 10.0,
+        poll_interval: float = 60.0,
         max_wait: float = 3600.0,
     ) -> dict[str, Any]:
         """Block until the prediction reaches a terminal status.
 
-        Uses exponential backoff starting from *poll_interval* up to 60 s.
+        Polls every *poll_interval* seconds (default 60 s).
 
         Raises:
             RuntimeError: If the prediction fails or times out.
         """
         elapsed = 0.0
-        interval = poll_interval
         while elapsed < max_wait:
             pred = self.get_prediction(prediction_id)
             status = pred.get("status", "unknown")
@@ -130,9 +129,8 @@ class StudioClient:
                 raise RuntimeError(
                     f"Prediction {prediction_id} ended with status '{status}'"
                 )
-            time.sleep(interval)
-            elapsed += interval
-            interval = min(interval * 1.5, 60.0)
+            time.sleep(poll_interval)
+            elapsed += poll_interval
         raise RuntimeError(
             f"Prediction {prediction_id} still running after {max_wait:.0f}s"
         )

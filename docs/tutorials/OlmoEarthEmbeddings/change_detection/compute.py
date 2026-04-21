@@ -71,16 +71,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _submit_and_download(
+def _submit(
     client: StudioClient,
     project_id: str,
     model_id: str,
     name: str,
     geojson: dict,  # type: ignore[type-arg]
     datetime_range: str,
-    out_dir: Path,
-) -> Path:
-    """Submit a prediction, poll, and download the embedding COG."""
+) -> str:
+    """Submit a prediction and return its ID."""
     print(f"Submitting prediction: {name}...")
     pred = client.create_prediction(
         project_id=project_id,
@@ -91,8 +90,16 @@ def _submit_and_download(
     )
     prediction_id = pred["id"]
     print(f"  prediction_id: {prediction_id}")
+    return prediction_id
 
-    print("Polling for completion...")
+
+def _poll_and_download(
+    client: StudioClient,
+    prediction_id: str,
+    out_dir: Path,
+) -> Path:
+    """Poll a prediction until complete, then download the embedding COG."""
+    print(f"Polling prediction {prediction_id}...")
     result = client.poll_prediction(prediction_id)
     results = result.get("prediction_results", [])
     if not results:
@@ -120,24 +127,25 @@ def main() -> None:
     before_dir = args.out_dir / "sept_2023"
     after_dir = args.out_dir / "sept_2024"
 
-    before_embed = _submit_and_download(
+    before_id = _submit(
         client,
         project_id,
         monthly_model_id,
         "park-fire-sept-2023",
         PARK_FIRE_GEOJSON,
         BEFORE_DATETIME,
-        before_dir,
     )
-    after_embed = _submit_and_download(
+    after_id = _submit(
         client,
         project_id,
         monthly_model_id,
         "park-fire-sept-2024",
         PARK_FIRE_GEOJSON,
         AFTER_DATETIME,
-        after_dir,
     )
+
+    before_embed = _poll_and_download(client, before_id, before_dir)
+    after_embed = _poll_and_download(client, after_id, after_dir)
 
     print("\nDownloading Sentinel-2 RGB for September 2023...")
     download_s2_rgb(

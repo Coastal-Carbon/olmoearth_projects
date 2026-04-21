@@ -19,14 +19,16 @@ Sentinel-2 L2A imagery. Example 3 uses the same encoder at 1 monthly period.
 
 ## Prerequisites
 
-Install dependencies from the repo root:
+Install dependencies:
 
 ```bash
-uv sync
+pip install -r requirements.txt
 ```
 
-You also need an **OlmoEarth Studio API key**. Set it as an environment
-variable or pass it via `--api-key`:
+You also need an **OlmoEarth Studio API key**.
+[Reach out](https://allenai.org/olmoearth) if you're interested in gaining
+access. Once signed in, go to **Settings > API Keys** to create a key.
+Set it as an environment variable or pass it via `--api-key`:
 
 ```bash
 export OLMOEARTH_API_KEY="your-key-here"
