@@ -6,7 +6,7 @@ via the Studio API. These scripts reproduce the use cases from the
 
 1. **Similarity search** -- cosine-similarity heatmap and patch mosaic over
    California's Central Valley.
-2. **Per-pixel segmentation** -- few-shot land-cover classification from 60
+2. **Per-pixel segmentation** -- few-shot land-cover segmentation from 60
    labeled pixels in Ca Mau (Vietnam).
 3. **Change detection** -- wildfire burn scar detection via cosine distance
    between monthly embeddings (Park Fire, California, Sept 2023 vs Sept 2024).
@@ -124,7 +124,7 @@ OlmoEarthEmbeddings/
     notebooks/
         change_detection.ipynb  # interactive change detection
         pca.ipynb               # interactive PCA analysis
-        segmentation.ipynb      # interactive few-shot classification
+        segmentation.ipynb      # interactive few-shot segmentation
         similarity.ipynb        # interactive similarity analysis
     pca/
         analyze.py              # PCA false-color figure

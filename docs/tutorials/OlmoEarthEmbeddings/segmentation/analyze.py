@@ -1,4 +1,4 @@
-"""Few-shot mangrove classification from OlmoEarth embeddings.
+"""Few-shot mangrove segmentation from OlmoEarth embeddings.
 
 Samples a small number of labeled pixels (e.g., 20 per class) from ESA
 WorldCover within a single region (Ca Mau, Vietnam) and trains a logistic
@@ -260,7 +260,7 @@ def train_fewshot(
 
 
 def make_fewshot_figure(result: FewShotResult) -> Figure:
-    """Create a 1x3 few-shot classification figure.
+    """Create a 1x3 few-shot segmentation figure.
 
     Returns the matplotlib Figure (caller decides whether to save or show).
     """
@@ -324,7 +324,7 @@ def make_fewshot_figure(result: FewShotResult) -> Figure:
     )
 
     fig.suptitle(
-        f"Few-shot classification from {total} labeled pixels",
+        f"Few-shot segmentation from {total} labeled pixels",
         fontsize=15,
         fontweight="bold",
         y=0.99,

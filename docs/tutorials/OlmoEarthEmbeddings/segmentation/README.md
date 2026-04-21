@@ -1,6 +1,6 @@
 # Few-Shot Segmentation
 
-Few-shot land-cover classification over Ca Mau, Vietnam using OlmoEarth
+Few-shot land-cover segmentation over Ca Mau, Vietnam using OlmoEarth
 embeddings. Samples 60 labeled pixels (20 per class) from ESA WorldCover,
 trains a logistic regression, and predicts every pixel in the region.
 
@@ -20,10 +20,10 @@ python -m segmentation.analyze \
 
 ## Expected output
 
-**Few-shot classification** (`figures/fewshot_60labels.png`)
+**Few-shot segmentation** (`figures/fewshot_60labels.png`)
 
 Left: Sentinel-2 RGB with 60 labeled pixels (magenta dots). Center:
-WorldCover reference. Right: predicted classification (weighted F1 ~ 0.84;
+WorldCover reference. Right: predicted segmentation (weighted F1 ~ 0.84;
 exact score depends on which pixels are sampled).
 
-![few-shot classification](figures/fewshot_60labels.png)
+![few-shot segmentation](figures/fewshot_60labels.png)
