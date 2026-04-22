@@ -124,36 +124,33 @@ def _interpolate_nodata(rgb: np.ndarray, max_dist: float = 48.0) -> np.ndarray:
 
 
 def _global_stretch(rgb_chw: np.ndarray, gamma: float = 0.92) -> np.ndarray:
-    """Percentile-stretch (3, H, W) to (H, W, 3) in [0, 1]."""
+    """Percentile stretch (3, H, W) to (H, W, 3) in [0, 1]."""
     hwc = np.moveaxis(rgb_chw, 0, -1).astype(np.float32).copy()
-    ok = np.isfinite(hwc)
+    ok = np.isfinite(hwc).all(axis=-1) & (hwc.sum(axis=-1) != 0)
     lo, hi = np.nanpercentile(hwc[ok], [2, 98])
-    hwc = np.clip((hwc - lo) / max(float(hi - lo), 1e-8), 0.0, 1.0)
+    hwc = np.clip((hwc - lo) / max(float(hi - lo), 1e-6), 0.0, 1.0)
     if abs(gamma - 1.0) > 1e-6:
-        hwc = np.power(np.clip(hwc, 0.0, 1.0), gamma)
+        hwc = np.power(hwc, gamma)
     hwc[np.isnan(hwc)] = 0.15
     return hwc
 
 
 def _patch_stretch(
     patch_chw: np.ndarray,
-    gain: float = 2.6,
     gamma: float = 0.92,
 ) -> np.ndarray:
     """Per-patch percentile stretch for thumbnail display."""
-    patch = np.asarray(patch_chw, dtype=np.float64).copy()
-    if abs(gain - 1.0) > 1e-8:
-        patch = np.clip(patch * gain, 0.0, 1.0)
-    hwc = np.moveaxis(patch, 0, -1).copy()
-    ok = np.isfinite(hwc)
-    if not np.any(ok):
+    hwc = np.moveaxis(np.asarray(patch_chw, dtype=np.float32), 0, -1).copy()
+    if not np.any(np.isfinite(hwc)):
         return np.full(hwc.shape, 0.45, dtype=np.float32)
-    lo, hi = np.nanpercentile(hwc[ok], [2, 98])
-    hwc = np.clip((hwc - lo) / max(float(hi - lo), 1e-8), 0.0, 1.0)
+    ok = np.isfinite(hwc).all(axis=-1) & (hwc.sum(axis=-1) != 0)
+    if np.any(ok):
+        lo, hi = np.nanpercentile(hwc[ok], [2, 98])
+        hwc = np.clip((hwc - lo) / max(float(hi - lo), 1e-6), 0.0, 1.0)
     if abs(gamma - 1.0) > 1e-6:
-        hwc = np.power(np.clip(hwc, 0.0, 1.0), gamma)
+        hwc = np.power(hwc, gamma)
     hwc[np.isnan(hwc)] = 0.15
-    return hwc.astype(np.float32)
+    return hwc
 
 
 def _boxes_overlap(r1: int, c1: int, r2: int, c2: int, half: int, gap: int = 4) -> bool:

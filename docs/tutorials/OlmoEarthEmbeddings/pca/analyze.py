@@ -37,9 +37,10 @@ def _load_s2_rgb(path: Path, target_shape: tuple[int, int]) -> np.ndarray | None
         print(f"S2 shape {rgb.shape[1:]} != embed {h}x{w}; skipping S2 panel.")
         return None
     rgb = np.moveaxis(rgb, 0, -1)
-    lo, hi = np.nanpercentile(rgb, [2, 98])
+    nans = np.isnan(rgb).any(axis=-1)
+    lo, hi = np.nanpercentile(rgb[~nans], [2, 98])
     rgb = np.clip((rgb - lo) / max(float(hi - lo), 1e-6), 0, 1)
-    rgb[np.isnan(rgb).any(axis=-1)] = 0.15
+    rgb[nans] = 0.15
     return rgb
 
 

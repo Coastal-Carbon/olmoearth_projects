@@ -139,8 +139,12 @@ class StudioClient:
         self,
         download_token: str,
         out_dir: Path,
+        filename: str = "embeddings.tif",
     ) -> Path:
         """Download a prediction result ZIP and extract the embedding COG.
+
+        The first .tif found in the ZIP is saved as *filename* inside
+        *out_dir*.
 
         Returns:
             Path to the extracted .tif file.
@@ -154,16 +158,15 @@ class StudioClient:
 
         buf = io.BytesIO(resp.content)
         out_dir.mkdir(parents=True, exist_ok=True)
-        tif_path: Path | None = None
         with zipfile.ZipFile(buf) as zf:
             for name in zf.namelist():
                 if name.endswith(".tif"):
-                    zf.extract(name, out_dir)
-                    tif_path = out_dir / name
-        if tif_path is None:
-            raise RuntimeError("No .tif found in prediction result ZIP")
-        print(f"  extracted {tif_path}")
-        return tif_path
+                    data = zf.read(name)
+                    dest = out_dir / filename
+                    dest.write_bytes(data)
+                    print(f"  saved {dest}")
+                    return dest
+        raise RuntimeError("No .tif found in prediction result ZIP")
 
 
 def load_config(config_path: Path) -> dict[str, Any]:

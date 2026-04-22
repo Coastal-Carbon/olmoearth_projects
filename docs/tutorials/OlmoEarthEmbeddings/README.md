@@ -25,7 +25,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-You also need an **OlmoEarth Studio API key**.
+The compute scripts use the **OlmoEarth Studio API** to generate embeddings.
 [Reach out](https://allenai.org/olmoearth) if you're interested in gaining
 access. Once signed in, go to **Settings > API Keys** to create a key.
 Set it as an environment variable or pass it via `--api-key`:
@@ -33,6 +33,12 @@ Set it as an environment variable or pass it via `--api-key`:
 ```bash
 export OLMOEARTH_API_KEY="your-key-here"
 ```
+
+Alternatively, you can compute embeddings locally using the open-source
+OlmoEarth models without Studio access. See the
+[rslearn embeddings guide](https://github.com/allenai/rslearn/blob/master/docs/examples/OlmoEarthEmbeddings.md)
+for instructions. The analyze scripts work with any embedding COG regardless
+of how it was produced.
 
 ## Quick start
 

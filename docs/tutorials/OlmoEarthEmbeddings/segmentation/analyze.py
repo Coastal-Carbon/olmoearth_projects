@@ -92,17 +92,11 @@ def _load_s2_rgb(
 
 
 def _find_embeddings(directory: Path) -> Path:
-    """Locate the embedding .tif in *directory* (may be nested from ZIP extraction)."""
-    candidates = list(directory.rglob("*.tif"))
-    embed_candidates = [
-        p for p in candidates if "embed" in p.stem.lower() or "result" in p.stem.lower()
-    ]
-    if embed_candidates:
-        return embed_candidates[0]
-    tifs = [p for p in candidates if p.stem not in ("s2_rgb", "worldcover")]
-    if tifs:
-        return tifs[0]
-    raise FileNotFoundError(f"No embedding .tif found in {directory}")
+    """Return the path to the embedding COG in *directory*."""
+    path = directory / "embeddings.tif"
+    if path.exists():
+        return path
+    raise FileNotFoundError(f"No embeddings.tif found in {directory}")
 
 
 def _wc_to_rgb(wc: np.ndarray) -> np.ndarray:
