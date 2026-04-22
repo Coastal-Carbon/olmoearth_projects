@@ -1,10 +1,11 @@
-"""Compute and download embeddings + Sentinel-2 RGB for the PCA example.
+"""Compute and download embeddings + Sentinel-2 RGB for the similarity example.
 
-Submits a prediction over Flevoland (Netherlands), polls until complete,
-downloads the embedding COG, and fetches a Sentinel-2 L2A median composite.
+Submits a prediction over California's Central Valley, polls until complete,
+downloads the embedding COG, and fetches a Sentinel-2 L2A median composite
+aligned to the same grid.
 
 Example:
-    $ python -m pca.compute --config config.json
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.similarity.compute --config config.json
 """
 
 from __future__ import annotations
@@ -12,10 +13,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common.imagery_sources import download_s2_rgb
-from common.studio_client import client_from_args, load_config
+from olmoearth_embeddings_tutorial.common.imagery_sources import download_s2_rgb
+from olmoearth_embeddings_tutorial.common.studio_client import (
+    client_from_args,
+    load_config,
+)
 
-FLEVOLAND_GEOJSON = {
+CENTRAL_VALLEY_GEOJSON = {
     "type": "FeatureCollection",
     "features": [
         {
@@ -25,11 +29,11 @@ FLEVOLAND_GEOJSON = {
                 "type": "Polygon",
                 "coordinates": [
                     [
-                        [5.35, 52.30],
-                        [5.35, 52.60],
-                        [5.80, 52.60],
-                        [5.80, 52.30],
-                        [5.35, 52.30],
+                        [-120.75, 36.65],
+                        [-120.75, 37.15],
+                        [-120.15, 37.15],
+                        [-120.15, 36.65],
+                        [-120.75, 36.65],
                     ]
                 ],
             },
@@ -62,7 +66,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=Path("data/flevoland"),
+        default=Path("data/central_valley"),
         help="Directory for downloaded data.",
     )
     return parser.parse_args()
@@ -77,12 +81,12 @@ def main() -> None:
     project_id = cfg["project_id"]
     model_id = cfg["model_id"]
 
-    print("Submitting Flevoland prediction...")
+    print("Submitting Central Valley prediction...")
     pred = client.create_prediction(
         project_id=project_id,
         model_id=model_id,
-        name="flevoland-embeddings",
-        geojson=FLEVOLAND_GEOJSON,
+        name="central-valley-embeddings",
+        geojson=CENTRAL_VALLEY_GEOJSON,
         datetime_range=DATETIME_RANGE,
     )
     prediction_id = pred["id"]

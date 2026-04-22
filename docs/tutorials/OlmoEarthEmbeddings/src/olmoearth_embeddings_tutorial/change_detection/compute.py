@@ -6,7 +6,7 @@ using monthly embeddings -- September 2023 (before) and September 2024
 both periods.
 
 Example:
-    $ python -m change_detection.compute --config config.json
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.change_detection.compute --config config.json
 """
 
 from __future__ import annotations
@@ -14,8 +14,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common.imagery_sources import download_s2_rgb
-from common.studio_client import StudioClient, client_from_args, load_config
+from olmoearth_embeddings_tutorial.common.imagery_sources import download_s2_rgb
+from olmoearth_embeddings_tutorial.common.studio_client import (
+    StudioClient,
+    client_from_args,
+    load_config,
+)
 
 PARK_FIRE_GEOJSON = {
     "type": "FeatureCollection",

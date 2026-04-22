@@ -9,10 +9,10 @@ similar colors.
 
 ```bash
 # 1. Compute embeddings and download imagery
-python -m pca.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.pca.compute --config config.json
 
 # 2. Analyze and generate figure
-python -m pca.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.pca.analyze \
     --embed data/flevoland/embeddings.tif \
     --rgb data/flevoland/s2_rgb.tif \
     --out figures/

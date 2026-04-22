@@ -5,7 +5,7 @@ time periods and generates a 1x3 figure: S2 RGB (before) | S2 RGB (after) |
 change magnitude heatmap.
 
 Example:
-    $ python -m change_detection.analyze \
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.change_detection.analyze \
         --before-dir data/change_detection/sept_2023 \
         --after-dir data/change_detection/sept_2024 \
         --out figures/
@@ -20,8 +20,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from common.embedding_utils import load_embeddings
 from matplotlib.figure import Figure
+
+from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
 
 
 def _load_s2_rgb(path: Path) -> np.ndarray | None:

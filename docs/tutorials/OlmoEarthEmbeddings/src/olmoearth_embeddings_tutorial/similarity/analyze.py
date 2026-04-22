@@ -7,7 +7,7 @@ pixel, computes a per-pixel cosine similarity map, and generates two figures:
 2. A patch mosaic showing the most and least similar locations.
 
 Example:
-    $ python -m similarity.analyze \
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.similarity.analyze \
         --embed data/central_valley/embeddings.tif \
         --rgb data/central_valley/s2_rgb.tif \
         --out figures/
@@ -23,12 +23,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 import rasterio.fill
-from common.embedding_utils import load_embeddings
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from rasterio.transform import rowcol
 from rasterio.warp import Resampling, reproject
 from rasterio.warp import transform as warp_transform
+
+from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
 
 QUERY_LON = -120.45
 QUERY_LAT = 36.90

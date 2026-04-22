@@ -50,7 +50,7 @@ Run all commands from this directory
 Create a Studio project and two embeddings models (annual and monthly):
 
 ```bash
-python -m setup_model
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.setup_model
 ```
 
 This writes `config.json` with `project_id`, `model_id` (annual), and
@@ -59,8 +59,8 @@ This writes `config.json` with `project_id`, `model_id` (annual), and
 ### 2. Similarity search
 
 ```bash
-python -m similarity.compute --config config.json
-python -m similarity.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.similarity.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.similarity.analyze \
     --embed data/central_valley/embeddings.tif \
     --rgb data/central_valley/s2_rgb.tif \
     --out figures/
@@ -71,8 +71,8 @@ Outputs: `figures/similarity_heatmap.png`, `figures/similarity_mosaic.png`.
 ### 3. Few-shot segmentation
 
 ```bash
-python -m segmentation.compute --config config.json
-python -m segmentation.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.segmentation.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.segmentation.analyze \
     --data-dir data/segmentation/ca_mau \
     --out figures/
 ```
@@ -82,8 +82,8 @@ Output: `figures/fewshot_60labels.png`.
 ### 4. Change detection
 
 ```bash
-python -m change_detection.compute --config config.json
-python -m change_detection.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.change_detection.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.change_detection.analyze \
     --before-dir data/change_detection/sept_2023 \
     --after-dir data/change_detection/sept_2024 \
     --out figures/
@@ -94,8 +94,8 @@ Output: `figures/change_detection.png`.
 ### 5. PCA false-color
 
 ```bash
-python -m pca.compute --config config.json
-python -m pca.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.pca.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.pca.analyze \
     --embed data/flevoland/embeddings.tif \
     --rgb data/flevoland/s2_rgb.tif \
     --out figures/
@@ -118,31 +118,33 @@ jupyter notebook notebooks/similarity.ipynb
 
 ```
 OlmoEarthEmbeddings/
-    config.json                 # (generated) project/model IDs
-    setup_model.py              # one-time project + model creation
-    change_detection/
-        analyze.py              # cosine distance + figure
-        compute.py              # submit + download Park Fire (monthly)
-    common/
-        embedding_utils.py      # load embedding COGs
-        imagery_sources.py      # Sentinel-2 RGB + WorldCover download
-        studio_client.py        # API client, polling, result download
-    data/                       # (generated, git-ignored)
-    figures/                    # (generated, git-ignored)
+    config.json                       # (generated) project/model IDs
+    data/                             # (generated, git-ignored)
+    figures/                          # (generated, git-ignored)
     notebooks/
-        change_detection.ipynb  # interactive change detection
-        pca.ipynb               # interactive PCA analysis
-        segmentation.ipynb      # interactive few-shot segmentation
-        similarity.ipynb        # interactive similarity analysis
-    pca/
-        analyze.py              # PCA false-color figure
-        compute.py              # submit + download Flevoland
-    segmentation/
-        analyze.py              # few-shot linear probe + figure
-        compute.py              # submit + download Ca Mau
-    similarity/
-        analyze.py              # heatmap + patch mosaic
-        compute.py              # submit + download Central Valley
+        change_detection.ipynb        # interactive change detection
+        pca.ipynb                     # interactive PCA analysis
+        segmentation.ipynb            # interactive few-shot segmentation
+        similarity.ipynb              # interactive similarity analysis
+    src/
+        olmoearth_embeddings_tutorial/
+            setup_model.py            # one-time project + model creation
+            common/
+                embedding_utils.py    # load embedding COGs
+                imagery_sources.py    # Sentinel-2 RGB + WorldCover download
+                studio_client.py      # API client, polling, result download
+            change_detection/
+                analyze.py            # cosine distance + figure
+                compute.py            # submit + download Park Fire (monthly)
+            pca/
+                analyze.py            # PCA false-color figure
+                compute.py            # submit + download Flevoland
+            segmentation/
+                analyze.py            # few-shot linear probe + figure
+                compute.py            # submit + download Ca Mau
+            similarity/
+                analyze.py            # heatmap + patch mosaic
+                compute.py            # submit + download Central Valley
 ```
 
 ## Notes

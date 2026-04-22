@@ -8,7 +8,7 @@ enable accurate wall-to-wall maps from very few labels.
 Generates a 1x3 figure: S2 RGB (with training dots) | WorldCover ref | predicted.
 
 Example:
-    $ python -m segmentation.analyze \
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.segmentation.analyze \
         --data-dir data/segmentation/ca_mau \
         --out figures/
 """
@@ -22,7 +22,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from common.embedding_utils import load_embeddings
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from rasterio.warp import Resampling, reproject
@@ -30,6 +29,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, jaccard_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+
+from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
 
 WORLDCOVER_MANGROVE = 95
 WORLDCOVER_WATER = 80

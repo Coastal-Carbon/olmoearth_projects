@@ -57,9 +57,6 @@ extend-select = ["D", "I", "UP"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.mypy]
-explicit_package_bases = true
-
 [tool.pytest.ini_options]
 testpaths = [
     "tests",

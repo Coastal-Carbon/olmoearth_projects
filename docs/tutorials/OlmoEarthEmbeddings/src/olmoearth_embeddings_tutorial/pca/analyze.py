@@ -5,7 +5,7 @@ R/G/B channels.  Pixels with similar embeddings receive similar colors, giving
 a spatial "similarity image" that is directly comparable to Sentinel-2 RGB.
 
 Example:
-    $ python -m pca.analyze \
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.pca.analyze \
         --embed data/flevoland/embeddings.tif \
         --rgb data/flevoland/s2_rgb.tif \
         --out figures/
@@ -20,10 +20,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
-from common.embedding_utils import load_embeddings
 from matplotlib.figure import Figure
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+
+from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
 
 
 def _load_s2_rgb(path: Path, target_shape: tuple[int, int]) -> np.ndarray | None:

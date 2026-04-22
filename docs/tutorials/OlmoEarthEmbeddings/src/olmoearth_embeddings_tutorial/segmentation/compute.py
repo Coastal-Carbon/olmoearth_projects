@@ -4,7 +4,7 @@ Submits a prediction for Ca Mau (Vietnam), polls until complete, then
 downloads the embedding COG, Sentinel-2 RGB composite, and ESA WorldCover.
 
 Example:
-    $ python -m segmentation.compute --config config.json
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.segmentation.compute --config config.json
 """
 
 from __future__ import annotations
@@ -12,8 +12,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common.imagery_sources import download_s2_rgb, download_worldcover
-from common.studio_client import StudioClient, client_from_args, load_config
+from olmoearth_embeddings_tutorial.common.imagery_sources import (
+    download_s2_rgb,
+    download_worldcover,
+)
+from olmoearth_embeddings_tutorial.common.studio_client import (
+    StudioClient,
+    client_from_args,
+    load_config,
+)
 
 CA_MAU_GEOJSON = {
     "type": "FeatureCollection",

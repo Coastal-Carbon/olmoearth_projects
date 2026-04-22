@@ -10,10 +10,10 @@ artifacts.
 
 ```bash
 # 1. Compute embeddings and download imagery for both periods
-python -m change_detection.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.change_detection.compute --config config.json
 
 # 2. Analyze and generate figure
-python -m change_detection.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.change_detection.analyze \
     --before-dir data/change_detection/sept_2023 \
     --after-dir data/change_detection/sept_2024 \
     --out figures/

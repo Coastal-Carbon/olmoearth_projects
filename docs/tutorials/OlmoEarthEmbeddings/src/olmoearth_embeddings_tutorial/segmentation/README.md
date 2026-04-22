@@ -10,10 +10,10 @@ Three classes: mangrove, water, other.
 
 ```bash
 # 1. Compute embeddings and download imagery + WorldCover
-python -m segmentation.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.segmentation.compute --config config.json
 
 # 2. Analyze and generate figure
-python -m segmentation.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.segmentation.analyze \
     --data-dir data/segmentation/ca_mau \
     --out figures/
 ```

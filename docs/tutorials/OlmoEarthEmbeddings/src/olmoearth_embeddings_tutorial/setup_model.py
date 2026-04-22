@@ -8,7 +8,7 @@ Both use 40-meter resolution with Sentinel-2 L2A imagery.  Writes the
 resulting IDs to a JSON config file that the per-example compute scripts read.
 
 Example:
-    $ python setup_model.py --api-key $OLMOEARTH_API_KEY
+    $ PYTHONPATH=src python -m olmoearth_embeddings_tutorial.setup_model --api-key $OLMOEARTH_API_KEY
 """
 
 from __future__ import annotations
@@ -16,7 +16,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common.studio_client import client_from_args, save_config
+from olmoearth_embeddings_tutorial.common.studio_client import (
+    client_from_args,
+    save_config,
+)
 
 DEFAULT_CONFIG = Path("config.json")
 

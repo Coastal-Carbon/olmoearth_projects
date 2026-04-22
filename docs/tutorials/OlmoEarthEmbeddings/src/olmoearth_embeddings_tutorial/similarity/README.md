@@ -11,10 +11,10 @@ the full embedding raster, and generates two figures:
 
 ```bash
 # 1. Compute embeddings and download imagery
-python -m similarity.compute --config config.json
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.similarity.compute --config config.json
 
 # 2. Analyze and generate figures
-python -m similarity.analyze \
+PYTHONPATH=src python -m olmoearth_embeddings_tutorial.similarity.analyze \
     --embed data/central_valley/embeddings.tif \
     --rgb data/central_valley/s2_rgb.tif \
     --out figures/
