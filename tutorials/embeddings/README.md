@@ -43,7 +43,7 @@ of how it was produced.
 ## Quick start
 
 Run all commands from this directory
-(`docs/tutorials/OlmoEarthEmbeddings/`).
+(`tutorials/embeddings/`).
 
 ### 1. One-time setup
 
@@ -117,7 +117,7 @@ jupyter notebook notebooks/similarity.ipynb
 ## Directory layout
 
 ```
-OlmoEarthEmbeddings/
+tutorials/embeddings/
     config.json                       # (generated) project/model IDs
     data/                             # (generated, git-ignored)
     figures/                          # (generated, git-ignored)
