@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from olmoearth_embeddings_tutorial.common.constants import S2_RGB_FILENAME
 from olmoearth_embeddings_tutorial.common.imagery_sources import download_s2_rgb
 from olmoearth_embeddings_tutorial.common.studio_client import (
     client_from_args,
@@ -103,7 +104,7 @@ def main() -> None:
     embed_path = client.download_prediction_result(download_token, args.out_dir)
 
     print("Downloading Sentinel-2 RGB median composite...")
-    s2_path = args.out_dir / "s2_rgb.tif"
+    s2_path = args.out_dir / S2_RGB_FILENAME
     download_s2_rgb(embed_path, s2_path, datetime_range="2024-01-01/2024-12-31")
 
     print(f"Done. Embeddings: {embed_path}, S2 RGB: {s2_path}")

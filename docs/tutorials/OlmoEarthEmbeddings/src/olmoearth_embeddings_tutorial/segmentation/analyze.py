@@ -30,6 +30,11 @@ from sklearn.metrics import accuracy_score, f1_score, jaccard_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from olmoearth_embeddings_tutorial.common.constants import (
+    EMBEDDINGS_FILENAME,
+    S2_RGB_FILENAME,
+    WORLDCOVER_FILENAME,
+)
 from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
 
 WORLDCOVER_MANGROVE = 95
@@ -94,10 +99,10 @@ def _load_s2_rgb(
 
 def _find_embeddings(directory: Path) -> Path:
     """Return the path to the embedding COG in *directory*."""
-    path = directory / "embeddings.tif"
+    path = directory / EMBEDDINGS_FILENAME
     if path.exists():
         return path
-    raise FileNotFoundError(f"No embeddings.tif found in {directory}")
+    raise FileNotFoundError(f"No {EMBEDDINGS_FILENAME} found in {directory}")
 
 
 def _wc_to_rgb(wc: np.ndarray) -> np.ndarray:
@@ -162,7 +167,7 @@ def train_fewshot(
     print(f"  {c} bands, {h}x{w}, valid: {valid.sum():,}")
 
     print("Loading WorldCover...")
-    wc = _reproject_band(data_dir / "worldcover.tif", ds)
+    wc = _reproject_band(data_dir / WORLDCOVER_FILENAME, ds)
     wc_int = np.round(wc).astype(np.int64)
     ref_ok = valid & (wc_int != 0)
 
@@ -238,7 +243,7 @@ def train_fewshot(
 
     ds.close()
 
-    s2_rgb = _load_s2_rgb(data_dir / "s2_rgb.tif")
+    s2_rgb = _load_s2_rgb(data_dir / S2_RGB_FILENAME)
 
     return FewShotResult(
         class_map=class_map,

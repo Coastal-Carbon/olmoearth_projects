@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from olmoearth_embeddings_tutorial.common.constants import S2_RGB_FILENAME
 from olmoearth_embeddings_tutorial.common.imagery_sources import download_s2_rgb
 from olmoearth_embeddings_tutorial.common.studio_client import (
     StudioClient,
@@ -153,12 +154,14 @@ def main() -> None:
 
     print("\nDownloading Sentinel-2 RGB for September 2023...")
     download_s2_rgb(
-        before_embed, before_dir / "s2_rgb.tif", datetime_range="2023-09-01/2023-10-01"
+        before_embed,
+        before_dir / S2_RGB_FILENAME,
+        datetime_range="2023-09-01/2023-10-01",
     )
 
     print("Downloading Sentinel-2 RGB for September 2024...")
     download_s2_rgb(
-        after_embed, after_dir / "s2_rgb.tif", datetime_range="2024-09-01/2024-10-01"
+        after_embed, after_dir / S2_RGB_FILENAME, datetime_range="2024-09-01/2024-10-01"
     )
 
     print(f"\nDone. Data saved under: {args.out_dir}")

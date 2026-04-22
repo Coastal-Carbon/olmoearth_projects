@@ -22,6 +22,10 @@ import numpy as np
 import rasterio
 from matplotlib.figure import Figure
 
+from olmoearth_embeddings_tutorial.common.constants import (
+    EMBEDDINGS_FILENAME,
+    S2_RGB_FILENAME,
+)
 from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
 
 
@@ -41,10 +45,10 @@ def _load_s2_rgb(path: Path) -> np.ndarray | None:
 
 def _find_embeddings(directory: Path) -> Path:
     """Return the path to the embedding COG in *directory*."""
-    path = directory / "embeddings.tif"
+    path = directory / EMBEDDINGS_FILENAME
     if path.exists():
         return path
-    raise FileNotFoundError(f"No embeddings.tif found in {directory}")
+    raise FileNotFoundError(f"No {EMBEDDINGS_FILENAME} found in {directory}")
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +118,8 @@ def compute_change(
     ds_b.close()
     ds_a.close()
 
-    s2_before = _load_s2_rgb(before_dir / "s2_rgb.tif")
-    s2_after = _load_s2_rgb(after_dir / "s2_rgb.tif")
+    s2_before = _load_s2_rgb(before_dir / S2_RGB_FILENAME)
+    s2_after = _load_s2_rgb(after_dir / S2_RGB_FILENAME)
 
     return ChangeResult(
         change=change,

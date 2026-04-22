@@ -12,6 +12,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from olmoearth_embeddings_tutorial.common.constants import (
+    S2_RGB_FILENAME,
+    WORLDCOVER_FILENAME,
+)
 from olmoearth_embeddings_tutorial.common.imagery_sources import (
     download_s2_rgb,
     download_worldcover,
@@ -123,11 +127,13 @@ def main() -> None:
 
     print("\nDownloading Sentinel-2 RGB...")
     download_s2_rgb(
-        ca_mau_embed, ca_mau_dir / "s2_rgb.tif", datetime_range="2024-01-01/2024-12-31"
+        ca_mau_embed,
+        ca_mau_dir / S2_RGB_FILENAME,
+        datetime_range="2024-01-01/2024-12-31",
     )
 
     print("Downloading WorldCover...")
-    download_worldcover(ca_mau_embed, ca_mau_dir / "worldcover.tif")
+    download_worldcover(ca_mau_embed, ca_mau_dir / WORLDCOVER_FILENAME)
 
     print(f"\nDone. Data saved under: {ca_mau_dir}")
 

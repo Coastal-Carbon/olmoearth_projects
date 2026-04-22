@@ -17,6 +17,8 @@ from typing import Any
 
 import requests
 
+from olmoearth_embeddings_tutorial.common.constants import EMBEDDINGS_FILENAME
+
 DEFAULT_BASE_URL = "https://olmoearth.allenai.org"
 
 
@@ -139,7 +141,7 @@ class StudioClient:
         self,
         download_token: str,
         out_dir: Path,
-        filename: str = "embeddings.tif",
+        filename: str = EMBEDDINGS_FILENAME,
     ) -> Path:
         """Download a prediction result ZIP and extract the embedding COG.
 
