@@ -30,6 +30,7 @@ from rasterio.warp import Resampling, reproject
 from rasterio.warp import transform as warp_transform
 
 from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
+from olmoearth_embeddings_tutorial.common.rgb_stretch import StretchMode, stretch_rgb
 
 QUERY_LON = -120.45
 QUERY_LAT = 36.90
@@ -53,6 +54,7 @@ class SimilarityResult:
     rgb_ok: np.ndarray
     cy: int
     cx: int
+    stretch: StretchMode = "percentile"
 
 
 def _cosine_similarity_map(
@@ -124,34 +126,26 @@ def _interpolate_nodata(rgb: np.ndarray, max_dist: float = 48.0) -> np.ndarray:
     return out
 
 
-def _global_stretch(rgb_chw: np.ndarray, gamma: float = 0.92) -> np.ndarray:
-    """Percentile stretch (3, H, W) to (H, W, 3) in [0, 1]."""
-    hwc = np.moveaxis(rgb_chw, 0, -1).astype(np.float32).copy()
-    ok = np.isfinite(hwc).all(axis=-1) & (hwc.sum(axis=-1) != 0)
-    lo, hi = np.nanpercentile(hwc[ok], [2, 98])
-    hwc = np.clip((hwc - lo) / max(float(hi - lo), 1e-6), 0.0, 1.0)
-    if abs(gamma - 1.0) > 1e-6:
-        hwc = np.power(hwc, gamma)
-    hwc[np.isnan(hwc)] = 0.15
-    return hwc
+def _global_stretch(
+    rgb_chw: np.ndarray,
+    gamma: float = 0.92,
+    mode: StretchMode = "percentile",
+) -> np.ndarray:
+    """Stretch (3, H, W) to (H, W, 3) in [0, 1]."""
+    hwc = np.moveaxis(rgb_chw, 0, -1)
+    return stretch_rgb(hwc, mode=mode, gamma=gamma)
 
 
 def _patch_stretch(
     patch_chw: np.ndarray,
     gamma: float = 0.92,
+    mode: StretchMode = "percentile",
 ) -> np.ndarray:
-    """Per-patch percentile stretch for thumbnail display."""
-    hwc = np.moveaxis(np.asarray(patch_chw, dtype=np.float32), 0, -1).copy()
+    """Per-patch stretch for thumbnail display."""
+    hwc = np.moveaxis(np.asarray(patch_chw, dtype=np.float32), 0, -1)
     if not np.any(np.isfinite(hwc)):
         return np.full(hwc.shape, 0.45, dtype=np.float32)
-    ok = np.isfinite(hwc).all(axis=-1) & (hwc.sum(axis=-1) != 0)
-    if np.any(ok):
-        lo, hi = np.nanpercentile(hwc[ok], [2, 98])
-        hwc = np.clip((hwc - lo) / max(float(hi - lo), 1e-6), 0.0, 1.0)
-    if abs(gamma - 1.0) > 1e-6:
-        hwc = np.power(hwc, gamma)
-    hwc[np.isnan(hwc)] = 0.15
-    return hwc
+    return stretch_rgb(hwc, mode=mode, gamma=gamma)
 
 
 def _boxes_overlap(r1: int, c1: int, r2: int, c2: int, half: int, gap: int = 4) -> bool:
@@ -219,6 +213,7 @@ def compute_similarity(
     rgb_path: Path,
     query_lon: float = QUERY_LON,
     query_lat: float = QUERY_LAT,
+    stretch: StretchMode = "percentile",
 ) -> SimilarityResult:
     """Load data and compute the cosine similarity map.
 
@@ -256,6 +251,7 @@ def compute_similarity(
         rgb_ok=rgb_ok,
         cy=cy,
         cx=cx,
+        stretch=stretch,
     )
 
 
@@ -266,7 +262,7 @@ def make_heatmap_figure(
 
     Returns the matplotlib Figure (caller decides whether to save or show).
     """
-    rgb_display = _global_stretch(result.rgb_raw)
+    rgb_display = _global_stretch(result.rgb_raw, mode=result.stretch)
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     fig.subplots_adjust(left=0.02, right=0.98, wspace=0.06)
 
@@ -346,11 +342,11 @@ def make_mosaic_figure(
     top_scores = [float(sim[r_, c_]) for r_, c_ in top_rc]
     bot_scores = [float(sim[r_, c_]) for r_, c_ in bot_rc]
 
-    rgb_global = _global_stretch(rgb_raw)
+    rgb_global = _global_stretch(rgb_raw, mode=result.stretch)
 
     def _patch(row: int, col: int) -> np.ndarray:
         crop = rgb_raw[:, row - half : row + half + 1, col - half : col + half + 1]
-        return _patch_stretch(crop)
+        return _patch_stretch(crop, mode=result.stretch)
 
     fig_w = 3.8 * K
     fig_h = 3.8 * 3
@@ -468,6 +464,12 @@ def parse_args() -> argparse.Namespace:
         default=QUERY_LAT,
         help="Query center latitude (WGS 84).",
     )
+    parser.add_argument(
+        "--stretch",
+        choices=["percentile", "fixed"],
+        default="percentile",
+        help="RGB stretch mode: 'percentile' (2/98) or 'fixed' ([0, 0.25] reflectance).",
+    )
     parser.add_argument("--dpi", type=int, default=200, help="Figure DPI.")
     return parser.parse_args()
 
@@ -475,7 +477,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Generate similarity heatmap and patch mosaic figures."""
     args = parse_args()
-    result = compute_similarity(args.embed, args.rgb, args.query_lon, args.query_lat)
+    result = compute_similarity(
+        args.embed, args.rgb, args.query_lon, args.query_lat, args.stretch
+    )
 
     args.out.mkdir(parents=True, exist_ok=True)
 

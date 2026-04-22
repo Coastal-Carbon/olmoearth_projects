@@ -25,9 +25,14 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
+from olmoearth_embeddings_tutorial.common.rgb_stretch import StretchMode, stretch_rgb
 
 
-def _load_s2_rgb(path: Path, target_shape: tuple[int, int]) -> np.ndarray | None:
+def _load_s2_rgb(
+    path: Path,
+    target_shape: tuple[int, int],
+    stretch: StretchMode = "percentile",
+) -> np.ndarray | None:
     """Load S2 RGB and stretch to [0, 1] for display."""
     if not path.exists():
         return None
@@ -38,11 +43,7 @@ def _load_s2_rgb(path: Path, target_shape: tuple[int, int]) -> np.ndarray | None
         print(f"S2 shape {rgb.shape[1:]} != embed {h}x{w}; skipping S2 panel.")
         return None
     rgb = np.moveaxis(rgb, 0, -1)
-    nans = np.isnan(rgb).any(axis=-1)
-    lo, hi = np.nanpercentile(rgb[~nans], [2, 98])
-    rgb = np.clip((rgb - lo) / max(float(hi - lo), 1e-6), 0, 1)
-    rgb[nans] = 0.15
-    return rgb
+    return stretch_rgb(rgb, mode=stretch)
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +190,12 @@ def parse_args() -> argparse.Namespace:
         help="Output directory for the figure.",
     )
     parser.add_argument("--seed", type=int, default=42, help="PCA random seed.")
+    parser.add_argument(
+        "--stretch",
+        choices=["percentile", "fixed"],
+        default="percentile",
+        help="RGB stretch mode: 'percentile' (2/98) or 'fixed' ([0, 0.25] reflectance).",
+    )
     parser.add_argument("--dpi", type=int, default=200, help="Figure DPI.")
     return parser.parse_args()
 
@@ -200,7 +207,7 @@ def main() -> None:
 
     s2_rgb = None
     if args.rgb is not None:
-        s2_rgb = _load_s2_rgb(args.rgb, (result.height, result.width))
+        s2_rgb = _load_s2_rgb(args.rgb, (result.height, result.width), args.stretch)
 
     fig = make_pca_figure(result, s2_rgb)
 

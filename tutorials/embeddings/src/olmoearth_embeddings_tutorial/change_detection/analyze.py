@@ -27,20 +27,20 @@ from olmoearth_embeddings_tutorial.common.constants import (
     S2_RGB_FILENAME,
 )
 from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
+from olmoearth_embeddings_tutorial.common.rgb_stretch import StretchMode, stretch_rgb
 
 
-def _load_s2_rgb(path: Path) -> np.ndarray | None:
-    """Load S2 RGB and percentile-stretch to [0, 1]."""
+def _load_s2_rgb(
+    path: Path,
+    stretch: StretchMode = "percentile",
+) -> np.ndarray | None:
+    """Load S2 RGB and stretch to [0, 1]."""
     if not path.exists():
         return None
     with rasterio.open(path) as ds:
         rgb = ds.read([1, 2, 3]).astype(np.float32)
     rgb = np.moveaxis(rgb, 0, -1)
-    nans = np.isnan(rgb).any(axis=-1) | (rgb.sum(axis=-1) == 0)
-    lo, hi = np.nanpercentile(rgb[~nans], [2, 98])
-    rgb = np.clip((rgb - lo) / max(float(hi - lo), 1e-6), 0, 1)
-    rgb[nans] = 0.15
-    return rgb
+    return stretch_rgb(rgb, mode=stretch)
 
 
 def _find_embeddings(directory: Path) -> Path:
@@ -73,6 +73,7 @@ def compute_change(
     after_dir: Path,
     before_label: str = "September 2023 (before)",
     after_label: str = "September 2024 (after)",
+    stretch: StretchMode = "percentile",
 ) -> ChangeResult:
     """Compute per-pixel cosine distance between two embedding sets.
 
@@ -118,8 +119,8 @@ def compute_change(
     ds_b.close()
     ds_a.close()
 
-    s2_before = _load_s2_rgb(before_dir / S2_RGB_FILENAME)
-    s2_after = _load_s2_rgb(after_dir / S2_RGB_FILENAME)
+    s2_before = _load_s2_rgb(before_dir / S2_RGB_FILENAME, stretch=stretch)
+    s2_after = _load_s2_rgb(after_dir / S2_RGB_FILENAME, stretch=stretch)
 
     return ChangeResult(
         change=change,
@@ -219,6 +220,12 @@ def parse_args() -> argparse.Namespace:
         default=Path("figures"),
         help="Output directory for the figure.",
     )
+    parser.add_argument(
+        "--stretch",
+        choices=["percentile", "fixed"],
+        default="percentile",
+        help="RGB stretch mode: 'percentile' (2/98) or 'fixed' ([0, 0.25] reflectance).",
+    )
     parser.add_argument("--dpi", type=int, default=200, help="Figure DPI.")
     return parser.parse_args()
 
@@ -227,7 +234,11 @@ def main() -> None:
     """Compute change detection and save the figure."""
     args = parse_args()
     result = compute_change(
-        args.before_dir, args.after_dir, args.before_label, args.after_label
+        args.before_dir,
+        args.after_dir,
+        args.before_label,
+        args.after_label,
+        args.stretch,
     )
 
     args.out.mkdir(parents=True, exist_ok=True)

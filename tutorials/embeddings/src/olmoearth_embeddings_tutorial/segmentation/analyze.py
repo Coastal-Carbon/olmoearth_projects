@@ -36,6 +36,7 @@ from olmoearth_embeddings_tutorial.common.constants import (
     WORLDCOVER_FILENAME,
 )
 from olmoearth_embeddings_tutorial.common.embedding_utils import load_embeddings
+from olmoearth_embeddings_tutorial.common.rgb_stretch import StretchMode, stretch_rgb
 
 WORLDCOVER_MANGROVE = 95
 WORLDCOVER_WATER = 80
@@ -70,6 +71,7 @@ def _reproject_band(
 def _load_s2_rgb(
     path: Path,
     match_ds: rasterio.DatasetReader | None = None,
+    stretch: StretchMode = "percentile",
 ) -> np.ndarray | None:
     """Load S2 RGB and stretch to [0, 1] for display."""
     if not path.exists():
@@ -90,11 +92,7 @@ def _load_s2_rgb(
         else:
             rgb = ds.read([1, 2, 3]).astype(np.float32)
     rgb = np.moveaxis(rgb, 0, -1)
-    nans = np.isnan(rgb).any(axis=-1) | (rgb.sum(axis=-1) == 0)
-    lo, hi = np.nanpercentile(rgb[~nans], [2, 98])
-    rgb = np.clip((rgb - lo) / max(float(hi - lo), 1e-6), 0, 1)
-    rgb[nans] = 0.15
-    return rgb
+    return stretch_rgb(rgb, mode=stretch)
 
 
 def _find_embeddings(directory: Path) -> Path:
@@ -152,6 +150,7 @@ def train_fewshot(
     data_dir: Path,
     n_per_class: int = 20,
     seed: int = 42,
+    stretch: StretchMode = "percentile",
 ) -> FewShotResult:
     """Train a few-shot classifier on a single region.
 
@@ -243,7 +242,7 @@ def train_fewshot(
 
     ds.close()
 
-    s2_rgb = _load_s2_rgb(data_dir / S2_RGB_FILENAME)
+    s2_rgb = _load_s2_rgb(data_dir / S2_RGB_FILENAME, stretch=stretch)
 
     return FewShotResult(
         class_map=class_map,
@@ -360,6 +359,12 @@ def parse_args() -> argparse.Namespace:
         help="Number of labeled pixels per class (default: 20, i.e., 60 total).",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
+    parser.add_argument(
+        "--stretch",
+        choices=["percentile", "fixed"],
+        default="percentile",
+        help="RGB stretch mode: 'percentile' (2/98) or 'fixed' ([0, 0.25] reflectance).",
+    )
     parser.add_argument("--dpi", type=int, default=200, help="Figure DPI.")
     return parser.parse_args()
 
@@ -367,7 +372,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Train few-shot classifier and save the figure."""
     args = parse_args()
-    result = train_fewshot(args.data_dir, args.n_per_class, args.seed)
+    result = train_fewshot(args.data_dir, args.n_per_class, args.seed, args.stretch)
 
     args.out.mkdir(parents=True, exist_ok=True)
     fig = make_fewshot_figure(result)

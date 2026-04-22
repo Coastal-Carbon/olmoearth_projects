@@ -47,6 +47,9 @@ def download_s2_rgb(
     all scenes within *datetime_range* that pass the cloud cover filter.  The
     result is reprojected to match the embedding grid exactly.
 
+    Applies the Sentinel-2 L2A BOA offset correction (PB 04.00+) before
+    scaling to reflectance: ``reflectance = (DN - 1000) / 10000``.
+
     Args:
         embed_path: Path to the embedding COG (defines extent and CRS).
         out_path: Destination for the 3-band float32 COG (reflectance 0-1).
@@ -97,7 +100,7 @@ def download_s2_rgb(
         fill_value=np.nan,
     )
     median = stack.median(dim="time", skipna=True).compute()
-    median = (median / 10_000.0).clip(0.0, 1.0).astype(np.float32)
+    median = ((median - 1000) / 10_000.0).clip(0.0, 1.0).astype(np.float32)
     median = median.assign_coords(band=["B04", "B03", "B02"])
     median = median.rio.write_crs(f"EPSG:{epsg}")
 
