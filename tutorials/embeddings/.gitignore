@@ -1,0 +1,15 @@
+# Downloaded data (embeddings, S2 RGB, WorldCover)
+data/
+
+# Generated figures (top-level)
+figures/
+
+# Keep reference figures checked in under each example
+!*/figures/
+!*/figures/**
+
+# API config with project/model IDs
+config.json
+
+# Jupyter notebook checkpoints
+notebooks/.ipynb_checkpoints/
