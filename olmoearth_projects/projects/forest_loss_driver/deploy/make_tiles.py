@@ -72,6 +72,9 @@ def make_tiles(workers: int, in_fname: str, gcs_ds_root: str) -> None:
                 "--no-tile-compression",
                 # Drop the smaller polygons in coarser zoom levels.
                 "--drop-smallest-as-needed",
+                # Keep tiles under 200 KB. The default is 500 KB, but this makes the
+                # web app sort of sluggish.
+                "--maximum-tile-bytes=200000",
                 local_fname,
             ]
         )  # nosec
