@@ -1,5 +1,6 @@
 """Code to deploy forest loss driver for weekly inference run."""
 
+import copy
 import io
 import json
 import multiprocessing
@@ -13,6 +14,7 @@ from datetime import datetime, timedelta
 
 import requests
 import shapely
+import shapely.geometry
 import tqdm
 from rslearn.const import WGS84_PROJECTION
 from rslearn.utils.feature import Feature
@@ -110,6 +112,31 @@ def _get_most_recent_friday() -> datetime:
     return friday
 
 
+def simplify_features_to_centroids(
+    features: list[dict],
+) -> list[dict]:
+    """Replace each feature's geometry with its centroid Point.
+
+    Studio's FixedWindowPartitioner only uses the centroid to create a 128x128 window,
+    so submitting Point geometries avoids issues with complex polygon geometries
+    causing Studio job failures.
+
+    Args:
+        features: list of GeoJSON feature dicts (in WGS84).
+
+    Returns:
+        a new list of feature dicts with Point geometries at each original centroid.
+    """
+    simplified = []
+    for feat in features:
+        feat = copy.deepcopy(feat)
+        shp = shapely.geometry.shape(feat["geometry"])
+        centroid = shp.centroid
+        feat["geometry"] = shapely.geometry.mapping(centroid)
+        simplified.append(feat)
+    return simplified
+
+
 def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
     """Starts inference jobs on Studio.
 
@@ -130,14 +157,16 @@ def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
     with run_paths.initial_alerts_fname.open() as f:
         geojson_data = json.load(f)
 
+    # Simplify geometries to centroid points to avoid Studio failures due to
+    # complex polygon geometries. The model only uses the centroid anyway.
+    all_features = simplify_features_to_centroids(geojson_data["features"])
+
     # Determine the chunks of alerts, we will create one job per chunk.
     chunks = []
-    for i in range(0, len(geojson_data["features"]), EVENTS_PER_STUDIO_JOB):
-        chunk = geojson_data["features"][i : i + EVENTS_PER_STUDIO_JOB]
+    for i in range(0, len(all_features), EVENTS_PER_STUDIO_JOB):
+        chunk = all_features[i : i + EVENTS_PER_STUDIO_JOB]
         chunks.append(chunk)
-    logger.info(
-        f"Got {len(chunks)} chunks with {len(geojson_data['features'])} total features"
-    )
+    logger.info(f"Got {len(chunks)} chunks with {len(all_features)} total features")
 
     # See if existing filename caching the job IDs exists.
     # If so, we load those already started jobs.
@@ -321,46 +350,62 @@ def get_prediction_results(job_ids: list[str], run_paths: RunPaths) -> list[Feat
 
 
 def add_input_properties_to_output_features(
-    input_features: list[Feature], output_features: list[Feature]
+    input_features: list[Feature],
+    output_features: list[Feature],
 ) -> None:
-    """Add properties from the corresponding input feature to each output feature.
+    """Add properties and geometry from the corresponding input feature to each output.
 
-    The input features should be a superset of the output features, but features could
-    have slight changes due to floating point rounding. We assume that the input
-    feature with the highest intersection area to the output feature is the matching
-    one. We raise error if this area is less than half of the feature's area.
+    Matching is done by centroid proximity: for each output feature, we find the input
+    feature whose WGS84 centroid is closest. This is robust to geometry changes (e.g.
+    when output features have simplified Point geometries from Studio).
+
+    The output feature's geometry is replaced with the matched input feature's geometry
+    to restore the original polygon.
+
+    Args:
+        input_features: the original input features (superset of outputs).
+        output_features: the output features from Studio to enrich.
     """
-    # 0.01 should give a reasonable number of grid cells (100 pixels).
+    # 0.01 should give a reasonable number of grid cells (~100 pixels).
     grid_index = GridIndex(0.01)
 
-    # Insert input features into the grid index.
+    # Insert input features into the grid index, keyed by their centroid.
     for input_feat in input_features:
         wgs84_geom = input_feat.geometry.to_projection(WGS84_PROJECTION)
-        grid_index.insert(
-            wgs84_geom.shp.bounds, (wgs84_geom.shp, input_feat.properties)
-        )
+        centroid = wgs84_geom.shp.centroid
+        # Use centroid point as both the bounds key and the stored value.
+        grid_index.insert(centroid.bounds, (centroid, input_feat))
 
-    # Get closest input feature to each output feature.
-    # And add the input properties.
+    # Match each output feature to the closest input feature by centroid distance.
     for output_feat in output_features:
         output_wgs84_geom = output_feat.geometry.to_projection(WGS84_PROJECTION)
-        candidates: list[tuple[shapely.Geometry, dict]] = grid_index.query(
-            output_wgs84_geom.shp.bounds
-        )
-        best_candidate_props: dict | None = None
-        best_candidate_score: float | None = None
-        for input_wgs84_shp, input_props in candidates:
-            score = input_wgs84_shp.intersection(output_wgs84_geom.shp).area
-            if score < output_wgs84_geom.shp.area / 2:
-                continue
-            if best_candidate_score is None or score > best_candidate_score:
-                best_candidate_props = input_props
-                best_candidate_score = score
+        output_centroid = output_wgs84_geom.shp.centroid
 
-        if best_candidate_props is None:
+        # Query a small region around the output centroid.
+        search_buffer = 0.01  # ~1km in WGS84 degrees
+        search_bounds = (
+            output_centroid.x - search_buffer,
+            output_centroid.y - search_buffer,
+            output_centroid.x + search_buffer,
+            output_centroid.y + search_buffer,
+        )
+        candidates: list[tuple[shapely.Point, Feature]] = grid_index.query(
+            search_bounds
+        )
+
+        best_input_feat: Feature | None = None
+        best_distance: float | None = None
+        for input_centroid, input_feat in candidates:
+            distance = output_centroid.distance(input_centroid)
+            if best_distance is None or distance < best_distance:
+                best_input_feat = input_feat
+                best_distance = distance
+
+        if best_input_feat is None:
             raise ValueError(f"found no input feature for output feature {output_feat}")
 
-        output_feat.properties.update(best_candidate_props)
+        output_feat.properties.update(best_input_feat.properties)
+        output_feat.geometry = best_input_feat.geometry
 
 
 def merge_forest_loss_events(
@@ -394,6 +439,8 @@ def merge_forest_loss_events(
     forest_loss_events = get_prediction_results(inference_job_ids, run_paths)
 
     # Add back properties we had on our original features, like "country".
+    # Also restore the original polygon geometries (Studio outputs have simplified
+    # Point geometries since we submit centroids to avoid complex geometry issues).
     input_features = vector_format.decode_from_file(run_paths.initial_alerts_fname)
     add_input_properties_to_output_features(input_features, forest_loss_events)
 
