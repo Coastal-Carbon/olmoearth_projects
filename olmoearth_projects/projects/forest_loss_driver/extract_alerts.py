@@ -192,6 +192,18 @@ def process_shapes_into_events(
         # (the default is 8).
         translated_shp = shapely.affinity.translate(shp, xoff=bounds[0], yoff=bounds[1])
         translated_shp = shapely.buffer(translated_shp, distance=1, quad_segs=4)
+        # Simplify the shape with a tolerance equal to 5% of it's min(height, width).
+        # This way we preserve very small events exactly, while greatly simplifying large events.
+        tolerance = min(
+            min(
+                translated_shp.bounds[2] - translated_shp.bounds[0],
+                translated_shp.bounds[3] - translated_shp.bounds[1],
+            )
+            / 20,
+            3,
+        )
+        if tolerance >= 1:
+            translated_shp = shapely.simplify(translated_shp, tolerance=tolerance)
 
         polygon_src_geom = STGeometry(
             projection,

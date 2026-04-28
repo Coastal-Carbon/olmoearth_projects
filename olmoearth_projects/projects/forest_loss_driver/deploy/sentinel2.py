@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from multiprocessing.pool import IMapIterator
 from typing import Any
 
+import shapely
 import tqdm
 from rslearn.config import QueryConfig, SpaceMode
 from rslearn.data_sources.data_source import Item
@@ -91,7 +92,7 @@ def _get_assets_for_feat(
         ts = datetime.fromisoformat(feat.properties["oe_start_time"])
         geometry = STGeometry(
             feat.geometry.projection,
-            feat.geometry.shp,
+            shapely.box(*feat.geometry.shp.bounds),
             (ts + offset, ts + offset + duration),
         )
         query_config = QueryConfig(
