@@ -63,8 +63,8 @@ def make_tiles(workers: int, in_fname: str, gcs_ds_root: str) -> None:
         subprocess.call(
             [
                 "tippecanoe",
-                # Choose the maximum zoom level automatically.
-                "-zg",
+                # Set maximum zoom level to 12.
+                "-z12",
                 # Write to directory.
                 "-e",
                 local_tile_dir,
