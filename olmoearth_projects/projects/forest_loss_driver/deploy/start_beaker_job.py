@@ -20,7 +20,7 @@ from olmoearth_projects.utils.logging import get_logger
 logger = get_logger(__name__)
 
 WORKSPACE = "ai2/earth-systems"
-BEAKER_BUDGET = "ai2/es-platform"
+BEAKER_BUDGET = "ai2/atec-olmoearth"
 BEAKER_IMAGE = "favyen/forest_loss_driver"  # nosec
 GCP_CREDENTIALS_SECRET = "RSLEARN_GCP_CREDENTIALS"  # nosec
 GOOGLE_CLOUD_PROJECT = "earthsystem-dev-c3po"  # nosec
