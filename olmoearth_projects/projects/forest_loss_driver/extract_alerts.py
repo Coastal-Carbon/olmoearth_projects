@@ -61,7 +61,15 @@ class ExtractAlertsArgs:
         min_confidence: the minimum confidence threshold.
         days: the number of days to consider before the prediction time.
         min_area: the minimum area threshold for an event to be extracted.
-        max_number_of_events: the maximum number of events to extract per GLAD tile.
+        max_number_of_events: the maximum number of events to extract. When slice_days
+            is None this is the maximum per GLAD tile; when slice_days is set this is
+            the maximum per time slice within each tile.
+        slice_days: if set, split the [prediction_time - days, prediction_time] window
+            into consecutive slices of this many days, and extract and sample events
+            independently within each slice. Because the GLAD date raster stores a
+            single date per pixel, this keeps connected components from different time
+            periods from merging together. When None (default), events are extracted
+            over the whole window at once (original behavior, no upper date bound).
         workers: number of parallel worker processes to use for extracting events.
     """
 
@@ -78,6 +86,7 @@ class ExtractAlertsArgs:
     days: int = 160
     min_area: float = 16.0
     max_number_of_events: int | None = None
+    slice_days: int | None = None
     workers: int = 8
 
 
@@ -230,6 +239,77 @@ def process_shapes_into_events(
     return events
 
 
+def extract_events_for_window(
+    args: ExtractAlertsArgs,
+    tif_fname: str,
+    conf_data: npt.NDArray,
+    date_data: npt.NDArray,
+    projection: Projection,
+    bounds: PixelBounds,
+    country_wgs84_shps: dict[str, shapely.Geometry] | None,
+    min_days: int,
+    max_days: int | None,
+) -> list[Feature]:
+    """Extract forest loss events from the rasters within a date window.
+
+    Args:
+        args: the ExtractAlertsArgs.
+        tif_fname: the GLAD alert tile filename being processed.
+        conf_data: the confidence raster.
+        date_data: the date raster (days since BASE_DATETIME).
+        projection: the projection of the pixel coordinates.
+        bounds: the bounds of the pixel coordinates.
+        country_wgs84_shps: optional dict mapping from country names to the WGS84
+            country polygons to limit events to.
+        min_days: the inclusive lower bound on the alert date, in days since
+            BASE_DATETIME.
+        max_days: the exclusive upper bound on the alert date, in days since
+            BASE_DATETIME. If None, no upper bound is applied.
+
+    Returns:
+        list of vector features, sampled down to max_number_of_events if set.
+    """
+    # Compute the mask based on the confidence and date conditions.
+    date_mask = date_data >= min_days
+    if max_days is not None:
+        date_mask = date_mask & (date_data < max_days)
+    conf_mask = conf_data >= args.min_confidence
+    forest_loss_mask = (date_mask & conf_mask).astype(np.uint8)
+
+    if np.count_nonzero(forest_loss_mask) == 0:
+        return []
+
+    # Extract shapely geometries from the mask.
+    shapes = list(rasterio.features.shapes(forest_loss_mask))
+
+    # Finally we can process those shapes into forest loss events.
+    # It requires a masked version of date_data, which we compute by multiplying
+    # date_data by the constraints masked.
+    masked_date_data = date_data * forest_loss_mask
+    events = process_shapes_into_events(
+        tif_fname=tif_fname,
+        shapes=shapes,
+        masked_date_data=masked_date_data,
+        projection=projection,
+        bounds=bounds,
+        country_wgs84_shps=country_wgs84_shps,
+        min_area=args.min_area,
+    )
+
+    # Limit to maximum number of events if desired.
+    if (
+        args.max_number_of_events is not None
+        and len(events) > args.max_number_of_events
+    ):
+        logger.info(
+            f"For tile {tif_fname} window [{min_days}, {max_days}), limiting from "
+            f"{len(events)} to {args.max_number_of_events} events"
+        )
+        events = random.sample(events, args.max_number_of_events)
+
+    return events
+
+
 def extract_events_for_tile(
     args: ExtractAlertsArgs,
     tif_fname: str,
@@ -260,47 +340,48 @@ def extract_events_for_tile(
     with open_rasterio_upath_reader(date_path) as src:
         date_data = src.read(1)
 
-    # Now we compute the mask based on the confidence and date conditions.
-    logger.info("Compute overall mask")
     now_days = (args.prediction_utc_time - BASE_DATETIME).days
     min_days = now_days - args.days
-    date_mask = date_data >= min_days
-    conf_mask = conf_data >= args.min_confidence
-    forest_loss_mask = (date_mask & conf_mask).astype(np.uint8)
 
-    if np.count_nonzero(forest_loss_mask) == 0:
-        logger.warning(
-            f"No forest loss events found for {tif_fname}, skipping further processing for this tile"
+    if args.slice_days is None:
+        # Extract events over the whole window at once. We pass max_days=None to
+        # preserve the original behavior of having no upper bound on the alert date.
+        logger.info(f"Compute mask for {tif_fname}")
+        events = extract_events_for_window(
+            args=args,
+            tif_fname=tif_fname,
+            conf_data=conf_data,
+            date_data=date_data,
+            projection=projection,
+            bounds=bounds,
+            country_wgs84_shps=country_wgs84_shps,
+            min_days=min_days,
+            max_days=None,
         )
-        return []
-
-    # Extract shapely geometries from the mask.
-    logger.info(f"Create shapes from mask for {tif_fname}")
-    shapes = list(rasterio.features.shapes(forest_loss_mask))
-
-    # Finally we can process those shapes into forest loss events.
-    # It requires a masked version of date_data, which we compute by multiplying
-    # date_data by the constraints masked.
-    masked_date_data = date_data * forest_loss_mask
-    events = process_shapes_into_events(
-        tif_fname=tif_fname,
-        shapes=shapes,
-        masked_date_data=masked_date_data,
-        projection=projection,
-        bounds=bounds,
-        country_wgs84_shps=country_wgs84_shps,
-        min_area=args.min_area,
-    )
-
-    # Limit to maximum number of events if desired.
-    if (
-        args.max_number_of_events is not None
-        and len(events) > args.max_number_of_events
-    ):
-        logger.info(
-            f"For tile {tif_fname}, limiting from {len(events)} to {args.max_number_of_events} events"
-        )
-        events = random.sample(events, args.max_number_of_events)
+    else:
+        # Split the window into consecutive slices of slice_days, extracting and
+        # sampling events independently within each slice. The upper bound of the
+        # final slice is now_days + 1 so that alerts dated exactly at the prediction
+        # time are included.
+        events = []
+        for slice_start in range(min_days, now_days + 1, args.slice_days):
+            slice_end = min(slice_start + args.slice_days, now_days + 1)
+            logger.info(
+                f"Compute mask for {tif_fname} slice [{slice_start}, {slice_end})"
+            )
+            events.extend(
+                extract_events_for_window(
+                    args=args,
+                    tif_fname=tif_fname,
+                    conf_data=conf_data,
+                    date_data=date_data,
+                    projection=projection,
+                    bounds=bounds,
+                    country_wgs84_shps=country_wgs84_shps,
+                    min_days=slice_start,
+                    max_days=slice_end,
+                )
+            )
 
     logger.info(f"Got {len(events)} events for tile {tif_fname}")
     return events

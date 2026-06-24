@@ -51,6 +51,16 @@ if __name__ == "__main__":
                 name="STUDIO_API_KEY",  # nosec
                 secret="STUDIO_API_KEY",  # nosec
             ),
+            # olmoearth_datasets API, used to identify Sentinel-2 assets for
+            # visualization (instead of the rate-limited Planetary Computer STAC API).
+            BeakerEnvVar(
+                name="OEDATASETS_API_URL",  # nosec
+                value="https://datasets.olmoearth.allenai.org",  # nosec
+            ),
+            BeakerEnvVar(
+                name="DATASETS_API_TOKEN",  # nosec
+                secret="LCC_DATASETS_API_TOKEN",  # nosec
+            ),
         ]
         datasets = [
             BeakerDataMount(
