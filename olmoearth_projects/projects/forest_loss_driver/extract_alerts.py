@@ -71,6 +71,10 @@ class ExtractAlertsArgs:
             periods from merging together. When None (default), events are extracted
             over the whole window at once (original behavior, no upper date bound).
         workers: number of parallel worker processes to use for extracting events.
+        smooth_polygons: if True (default), buffer each event polygon by 1 pixel
+            (rounded joins) and simplify it, which rounds off the blocky pixel edges.
+            If False, only apply a tiny 0.05-pixel buffer to fix geometry validity,
+            preserving the raw pixel-edge outline.
     """
 
     gcs_tiff_filenames: list[str]
@@ -88,6 +92,7 @@ class ExtractAlertsArgs:
     max_number_of_events: int | None = None
     slice_days: int | None = None
     workers: int = 8
+    smooth_polygons: bool = True
 
 
 def load_country_polygons(
@@ -130,6 +135,7 @@ def process_shapes_into_events(
     bounds: PixelBounds,
     country_wgs84_shps: dict[str, shapely.Geometry] | None,
     min_area: float,
+    smooth_polygons: bool = True,
 ) -> list[Feature]:
     """Process the forest loss shapes into vector features.
 
@@ -145,6 +151,10 @@ def process_shapes_into_events(
             countries will be returned, and the event properties will include a country
             field.
         min_area: minimum area constraint for each shape.
+        smooth_polygons: if True (default), buffer by 1 pixel (rounded joins) and
+            simplify each event polygon, rounding off the blocky pixel edges. If False,
+            only apply a tiny 0.05-pixel buffer to fix validity, preserving the raw
+            pixel-edge outline.
     """
     events: list[Feature] = []
     background_skip_count = 0
@@ -200,19 +210,28 @@ def process_shapes_into_events(
         # it is valid. We use quad_segs=4 to mitigate the growth in number of vertices
         # (the default is 8).
         translated_shp = shapely.affinity.translate(shp, xoff=bounds[0], yoff=bounds[1])
-        translated_shp = shapely.buffer(translated_shp, distance=1, quad_segs=4)
-        # Simplify the shape with a tolerance equal to 5% of it's min(height, width).
-        # This way we preserve very small events exactly, while greatly simplifying large events.
-        tolerance = min(
-            min(
-                translated_shp.bounds[2] - translated_shp.bounds[0],
-                translated_shp.bounds[3] - translated_shp.bounds[1],
+        if smooth_polygons:
+            translated_shp = shapely.buffer(translated_shp, distance=1, quad_segs=4)
+            # Simplify the shape with a tolerance equal to 5% of it's min(height, width).
+            # This way we preserve very small events exactly, while greatly simplifying large events.
+            tolerance = min(
+                min(
+                    translated_shp.bounds[2] - translated_shp.bounds[0],
+                    translated_shp.bounds[3] - translated_shp.bounds[1],
+                )
+                / 20,
+                3,
             )
-            / 20,
-            3,
-        )
-        if tolerance >= 1:
-            translated_shp = shapely.simplify(translated_shp, tolerance=tolerance)
+            if tolerance >= 1:
+                translated_shp = shapely.simplify(translated_shp, tolerance=tolerance)
+        else:
+            # No smoothing: apply only a tiny buffer to fix any geometry validity
+            # issues, preserving the raw blocky pixel-edge outline. Use a mitre join so
+            # the square pixel corners stay sharp; the default round join would expand
+            # every corner into an arc of redundant near-coincident vertices.
+            translated_shp = shapely.buffer(
+                translated_shp, distance=0.05, join_style="mitre"
+            )
 
         polygon_src_geom = STGeometry(
             projection,
@@ -294,6 +313,7 @@ def extract_events_for_window(
         bounds=bounds,
         country_wgs84_shps=country_wgs84_shps,
         min_area=args.min_area,
+        smooth_polygons=args.smooth_polygons,
     )
 
     # Limit to maximum number of events if desired.
