@@ -12,17 +12,6 @@ from typing import Any
 import requests
 import shapely
 import tqdm
-from geojson_pydantic.geometries import parse_geometry_obj
-from olmoearth_shared.api.common.search_filters import (
-    DatetimeFilter,
-    KeywordFilter,
-    SortDirection,
-)
-from olmoearth_shared.api.datasets.items import ItemSortField, SearchItemsRequest
-from olmoearth_shared.models.datasets.bands.sentinel2 import Sentinel2L2ABand
-from olmoearth_shared.models.datasets.collection import Collection
-from olmoearth_shared.models.datasets.data_provider_name import DataProviderName
-from olmoearth_shared.models.datasets.item import Item as ApiItem
 from rslearn.const import WGS84_PROJECTION
 from rslearn.dataset.manage import retry
 from rslearn.utils.feature import Feature
@@ -34,9 +23,16 @@ DURATION = timedelta(days=180)
 PRE_OFFSET = timedelta(days=-300)
 POST_OFFSET = timedelta(days=7)
 
-# Collection and bands of the visual (TCI) asset that we show in the web app.
-COLLECTION = Collection.SENTINEL_2_L2A
-VISUAL_BANDS = [Sentinel2L2ABand.R, Sentinel2L2ABand.G, Sentinel2L2ABand.B]
+# Collection and bands of the visual (TCI) asset that we show in the web app. These are
+# the string values used by the olmoearth_datasets API (the corresponding
+# olmoearth_shared enums are Collection.SENTINEL_2_L2A and Sentinel2L2ABand.R/G/B), kept
+# as plain literals here so this module does not depend on olmoearth_shared.
+COLLECTION = "sentinel-2-l2a"
+VISUAL_BANDS = ["R", "G", "B"]
+
+# Data provider name (olmoearth_shared DataProviderName.PLANETARY_COMPUTER) whose
+# unsigned GeoTIFF URLs we extract for visualization.
+PLANETARY_COMPUTER_PROVIDER = "planetary_computer"
 
 # Environment variables specifying how to reach the olmoearth_datasets API.
 API_URL_ENV_VAR = "OEDATASETS_API_URL"
@@ -57,37 +53,40 @@ def _get_session() -> requests.Session:
     return requests.Session()
 
 
-def _search_items(geometry: STGeometry, limit: int) -> list[ApiItem]:
+def _search_items(geometry: STGeometry, limit: int) -> list[dict[str, Any]]:
     """Search olmoearth_datasets for Sentinel-2 items intersecting the geometry.
 
     We query the olmoearth_datasets API rather than the Planetary Computer STAC API
     directly since the STAC API is heavily rate limited. Items are returned sorted by
     ascending cloud cover.
 
+    The request is built as a plain JSON body and the response records are returned as
+    raw dicts so this module does not depend on the olmoearth_shared API models.
+
     Args:
         geometry: the spatiotemporal geometry to search for.
         limit: the maximum number of items to return.
 
     Returns:
-        list of matching items, sorted by ascending cloud cover.
+        list of matching item dicts, sorted by ascending cloud cover.
     """
     wgs84_geometry = geometry.to_projection(WGS84_PROJECTION)
     geojson_dict = json.loads(shapely.to_geojson(wgs84_geometry.shp))
-    request = SearchItemsRequest(
-        collection=KeywordFilter[Collection](eq=COLLECTION),
-        intersects_geometry=parse_geometry_obj(geojson_dict),
-        limit=limit,
-        offset=0,
-        sort_by=ItemSortField.CLOUD_COVER,
-        sort_direction=SortDirection.ASC,
+    request: dict[str, Any] = {
+        "collection": {"eq": COLLECTION},
+        "intersects_geometry": geojson_dict,
+        "limit": limit,
+        "offset": 0,
+        "sort_by": "cloud_cover",
+        "sort_direction": "asc",
         # We store unsigned URLs; the web app signs them itself when reading images.
-        sign_urls=False,
-    )
+        "sign_urls": False,
+    }
     if wgs84_geometry.time_range is not None:
-        request.collected_at = DatetimeFilter(
-            gte=wgs84_geometry.time_range[0],
-            lt=wgs84_geometry.time_range[1],
-        )
+        request["collected_at"] = {
+            "gte": wgs84_geometry.time_range[0].isoformat(),
+            "lt": wgs84_geometry.time_range[1].isoformat(),
+        }
 
     api_url = os.environ[API_URL_ENV_VAR].rstrip("/")
     url = f"{api_url}/api/v1/items/search"
@@ -98,31 +97,30 @@ def _search_items(geometry: STGeometry, limit: int) -> list[ApiItem]:
 
     response = _get_session().post(
         url,
-        json=request.model_dump(mode="json", exclude_none=True),
+        json=request,
         headers=headers,
         timeout=REQUEST_TIMEOUT,
     )
     response.raise_for_status()
-    records = response.json()["records"] or []
-    return [ApiItem.model_validate(record) for record in records]
+    return response.json()["records"] or []
 
 
-def _get_planetary_computer_visual_url(api_item: ApiItem) -> str | None:
+def _get_planetary_computer_visual_url(api_item: dict[str, Any]) -> str | None:
     """Get the unsigned Planetary Computer visual (TCI) asset URL for an item.
 
     Args:
-        api_item: the item from the olmoearth_datasets API.
+        api_item: the item dict from the olmoearth_datasets API.
 
     Returns:
         the unsigned Planetary Computer URL for the visual asset, or None if the item
         has no Planetary Computer visual asset.
     """
-    provider = api_item.data_providers.get(DataProviderName.PLANETARY_COMPUTER)
+    provider = api_item.get("data_providers", {}).get(PLANETARY_COMPUTER_PROVIDER)
     if provider is None:
         return None
-    for asset in provider.assets:
-        if set(asset.bands) == set(VISUAL_BANDS):
-            return asset.url
+    for asset in provider.get("assets", []):
+        if set(asset.get("bands", [])) == set(VISUAL_BANDS):
+            return asset["url"]
     return None
 
 
@@ -196,7 +194,7 @@ def _get_assets_for_feat(
         box_shp = geometry.to_projection(WGS84_PROJECTION).shp
 
         # Run request with retries since the API may have transient errors.
-        api_items: list[ApiItem] = retry(
+        api_items: list[dict[str, Any]] = retry(
             fn=lambda: _search_items(geometry, limit=CANDIDATE_LIMIT),
             retry_max_attempts=10,
             retry_backoff=timedelta(seconds=5),
@@ -209,7 +207,7 @@ def _get_assets_for_feat(
             # Only use scenes that fully contain the event geometry. We use covers()
             # rather than contains() so degenerate (e.g. point) geometries, whose
             # interior is empty, are still matched.
-            item_shp = shapely.geometry.shape(api_item.properties.geometry)
+            item_shp = shapely.geometry.shape(api_item["properties"]["geometry"])
             if not item_shp.covers(box_shp):
                 continue
             # Get the unsigned Planetary Computer URL for the visual (TCI) asset. The
@@ -220,7 +218,7 @@ def _get_assets_for_feat(
             assets.append(
                 dict(
                     url=url,
-                    ts=api_item.properties.collected_at.isoformat(),
+                    ts=api_item["properties"]["collected_at"],
                 )
             )
 
