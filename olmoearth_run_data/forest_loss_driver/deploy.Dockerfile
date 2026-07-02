@@ -15,7 +15,7 @@ RUN make install
 WORKDIR /olmoearth_projects
 
 COPY pyproject.toml /olmoearth_projects/pyproject.toml
-COPY uv.lock /rslearn/uv.lock
+COPY uv.lock /olmoearth_projects/uv.lock
 RUN uv sync --all-extras --no-install-project
 
 ENV PATH="/olmoearth_projects/.venv/bin:$PATH"
