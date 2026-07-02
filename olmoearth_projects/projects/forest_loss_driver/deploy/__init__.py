@@ -9,7 +9,7 @@ import tempfile
 import time
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import requests
 import shapely
@@ -95,7 +95,7 @@ class RunPaths:
 
 def _get_most_recent_friday() -> datetime:
     """Get the most recent Friday."""
-    now = datetime.now()
+    now = datetime.now(tz=UTC)
     friday = now - timedelta(days=(now.weekday() - 4) % 7)
     return friday
 
