@@ -4,7 +4,6 @@ import copy
 import io
 import json
 import multiprocessing
-import os
 import shutil
 import tempfile
 import time
@@ -29,20 +28,21 @@ from olmoearth_projects.projects.forest_loss_driver.extract_alerts import (
     extract_alerts,
 )
 from olmoearth_projects.utils.logging import get_logger
+from olmoearth_projects.utils.studio_client import StudioClient
 
 from .make_tiles import make_tiles
 from .sentinel2 import get_sentinel2_assets
 
 logger = get_logger(__name__)
 
-BASE_URL = "https://olmoearth.allenai.org/api/v1"
 ORGANIZATION_ID = "f098bcba-b994-46ce-87fc-b90b14bb8338"  # Ai2 - Demo
 PROJECT_ID = (
     "2f3788b4-11bb-48ee-b379-eacccaf9734a"  # Forest Loss Driver Colombia 12 Demo
 )
 MODEL_ID = "a3c3e819-7aa9-47e9-98fa-f72449a56263"
+
+# Timeout (seconds) for downloading prediction results.
 REQUEST_TIMEOUT = 30
-UPLOAD_TIMEOUT = 300
 
 # Seconds to wait between polling for job status.
 POLL_SLEEP_TIME = 10
@@ -93,18 +93,6 @@ class RunPaths:
     global_latest_fname: UPath
 
 
-def get_studio_headers() -> dict[str, str]:
-    """Get the headers to use for Studio API requests.
-
-    The STUDIO_API_KEY environment variable must be set.
-    """
-    api_key = os.environ["STUDIO_API_KEY"]
-    return {
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "application/json",
-    }
-
-
 def _get_most_recent_friday() -> datetime:
     """Get the most recent Friday."""
     now = datetime.now()
@@ -137,7 +125,9 @@ def simplify_features_to_centroids(
     return simplified
 
 
-def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
+def start_studio_inference_jobs(
+    client: StudioClient, run_id: str, run_paths: RunPaths
+) -> list[str]:
     """Starts inference jobs on Studio.
 
     There is one job for each EVENTS_PER_STUDIO_JOB forest loss events. This is because
@@ -147,6 +137,7 @@ def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
     are returned.
 
     Args:
+        client: the Studio client to use.
         run_id: the run ID.
         run_paths: the paths to use for this run.
 
@@ -189,11 +180,11 @@ def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
         logger.info(
             f"Starting a prediction job with {len(chunk)} features named {chunk_name}"
         )
-        json_request_data = {
-            "model_id": MODEL_ID,
-            "name": chunk_name,
-            "project_id": PROJECT_ID,
-            "geojson": {
+        job_id = client.create_prediction(
+            project_id=PROJECT_ID,
+            model_id=MODEL_ID,
+            name=chunk_name,
+            geojson={
                 "type": "FeatureCollection",
                 "properties": {},
                 "features": chunk,
@@ -201,24 +192,10 @@ def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
             # Some recent forest loss events will not be successful due to not having
             # enough Sentinel-2 images after the event. So we lower the threshold to
             # 50% of windows needing to succeed.
-            "min_window_success_rate": 0.5,
-        }
-        url = f"{BASE_URL}/predictions"
-        response = requests.post(
-            url,
-            json=json_request_data,
-            timeout=(REQUEST_TIMEOUT, UPLOAD_TIMEOUT),
-            headers=get_studio_headers(),
+            min_window_success_rate=0.5,
         )
-        response.raise_for_status()
 
-        json_data = response.json()
-        if "records" not in json_data or len(json_data["records"]) != 1:
-            raise ValueError(
-                f"expected response to have one record, but got {json_data}"
-            )
-
-        job_ids_by_chunk[chunk_name] = json_data["records"][0]["id"]
+        job_ids_by_chunk[chunk_name] = job_id
 
         with open_atomic(run_paths.job_ids_fname, "w") as f:
             json.dump(job_ids_by_chunk, f)
@@ -226,36 +203,23 @@ def start_studio_inference_jobs(run_id: str, run_paths: RunPaths) -> list[str]:
     return list(job_ids_by_chunk.values())
 
 
-def wait_for_studio_job(job_id: str, max_consecutive_errors: int = 3) -> None:
-    """Wait for Studio prediction job to finish successfully.
+def wait_for_studio_job(
+    client: StudioClient, job_id: str, max_consecutive_errors: int = 3
+) -> None:
+    """Wait for a Studio prediction job to finish successfully.
 
     Raises an exception if the job fails.
 
     Args:
+        client: the Studio client to use.
         job_id: the job ID to check.
         max_consecutive_errors: maximum consecutive connection/timeout/response-format
             errors before giving up.
     """
-
-    def check_job_status() -> str:
-        url = f"{BASE_URL}/predictions/{job_id}"
-        response = requests.get(
-            url, timeout=REQUEST_TIMEOUT, headers=get_studio_headers()
-        )
-        response.raise_for_status()
-
-        json_data = response.json()
-        if "records" not in json_data or len(json_data["records"]) != 1:
-            raise ValueError(
-                f"expected response to have one record, but got {json_data}"
-            )
-
-        return json_data["records"][0]["status"]
-
     consecutive_errors = 0
     while True:
         try:
-            job_status = check_job_status()
+            job_status = client.get_prediction(job_id)["status"]
             consecutive_errors = 0
         except Exception as e:
             consecutive_errors += 1
@@ -269,9 +233,7 @@ def wait_for_studio_job(job_id: str, max_consecutive_errors: int = 3) -> None:
         if job_status in ["pending", "predicting"]:
             time.sleep(POLL_SLEEP_TIME)
             continue
-        elif (
-            job_status not in ["completed", "failed"]
-        ):  # tmp: we need to treat failed as completed since some jobs are stuck failed but have outputs
+        elif job_status != "completed":
             raise ValueError(
                 f"expected status to be pending or completed, but got {job_status}"
             )
@@ -279,33 +241,28 @@ def wait_for_studio_job(job_id: str, max_consecutive_errors: int = 3) -> None:
         break
 
 
-def get_prediction_result(job_id: str) -> list[Feature]:
+def get_prediction_result(client: StudioClient, job_id: str) -> list[Feature]:
     """Get the FeatureCollection result from a Studio job.
 
+    The prediction result is downloaded as a zip archive which, for our jobs, should
+    contain a single GeoJSON file.
+
     Args:
+        client: the Studio client to use.
         job_id: the Studio Prediction job ID.
 
     Returns:
-        the FeatureCollection dict.
+        the list of features in the prediction result.
     """
-    # Get the prediction results download_token.
-    url = f"{BASE_URL}/predictions/{job_id}"
-    response = requests.get(url, timeout=REQUEST_TIMEOUT, headers=get_studio_headers())
-    response.raise_for_status()
-    json_data = response.json()
-    if "records" not in json_data or len(json_data["records"]) != 1:
-        raise ValueError(f"expected response to have one record, but got {json_data}")
-    download_token = json_data["records"][0]["result"]["download_token"]
-
-    # Save the prediction result GeoJSON to a temp file.
-    url = f"{BASE_URL}/prediction-results/files?download_token={download_token}"
+    # Download the prediction result zip archive.
+    url = client.get_prediction_result_url(job_id)
     response = requests.get(url, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_fname = UPath(tmp_dir) / "data.geojson"
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-            # The download is zip archive which for our jobs should contain a single
+            # The download is a zip archive which for our jobs should contain a single
             # GeoJSON file. ".geojson" may appear in the middle of the name though, in
             # case filename is like result.geojson?Expires=...&Signature=...
             fnames = z.namelist()
@@ -321,10 +278,13 @@ def get_prediction_result(job_id: str) -> list[Feature]:
         return GeojsonVectorFormat().decode_from_file(tmp_fname)
 
 
-def get_prediction_results(job_ids: list[str], run_paths: RunPaths) -> list[Feature]:
+def get_prediction_results(
+    client: StudioClient, job_ids: list[str], run_paths: RunPaths
+) -> list[Feature]:
     """Get and cache prediction results across many Studio jobs.
 
     Args:
+        client: the Studio client to use.
         job_ids: list of Studio job IDs to get results for.
         run_paths: paths to use for this run.
 
@@ -342,7 +302,7 @@ def get_prediction_results(job_ids: list[str], run_paths: RunPaths) -> list[Feat
     forest_loss_events: list[Feature] = []
     for job_id in job_ids:
         logger.info(f"Getting forest loss event outputs from job {job_id}")
-        forest_loss_events.extend(get_prediction_result(job_id))
+        forest_loss_events.extend(get_prediction_result(client, job_id))
 
     # Cache and return the events.
     vector_format.encode_to_file(run_paths.raw_studio_outputs_fname, forest_loss_events)
@@ -409,7 +369,10 @@ def add_input_properties_to_output_features(
 
 
 def merge_forest_loss_events(
-    inference_job_ids: list[str], asset_workers: int, run_paths: RunPaths
+    client: StudioClient,
+    inference_job_ids: list[str],
+    asset_workers: int,
+    run_paths: RunPaths,
 ) -> list[Feature]:
     """Get the forest loss events from Studio and merge them with previous events.
 
@@ -420,6 +383,7 @@ def merge_forest_loss_events(
     it.
 
     Args:
+        client: the Studio client to use.
         inference_job_ids: the Studio job IDs for this run.
         asset_workers: number of workers for getting Sentinel-2 assets.
         run_paths: paths to use for this run.
@@ -436,7 +400,7 @@ def merge_forest_loss_events(
         return vector_format.decode_from_file(run_paths.all_events_fname)
 
     # Get prediction result from Studio.
-    forest_loss_events = get_prediction_results(inference_job_ids, run_paths)
+    forest_loss_events = get_prediction_results(client, inference_job_ids, run_paths)
 
     # Add back properties we had on our original features, like "country".
     # Also restore the original polygon geometries (Studio outputs have simplified
@@ -587,18 +551,20 @@ def integrated_pipeline(integrated_config: IntegratedConfig) -> None:
         )
 
     # Start the Studio inference job.
-    inference_job_ids = start_studio_inference_jobs(run_id, run_paths)
+    client = StudioClient.from_env()
+    inference_job_ids = start_studio_inference_jobs(client, run_id, run_paths)
     logger.info(f"Got Studio inference job IDs: {inference_job_ids}")
 
     # Check job status.
     for job_id in inference_job_ids:
-        wait_for_studio_job(job_id)
+        wait_for_studio_job(client, job_id)
 
     # Get forest loss events from Studio, identify Sentinel-2 assets for visualization
     # for each event, and merge in previous events before the time window we are
     # processing.
     # This function will also save all_events.geojson in gcs_ds_root.
     forest_loss_events = merge_forest_loss_events(
+        client=client,
         inference_job_ids=inference_job_ids,
         asset_workers=integrated_config.asset_workers,
         run_paths=run_paths,
