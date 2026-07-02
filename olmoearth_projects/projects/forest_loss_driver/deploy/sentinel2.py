@@ -129,6 +129,8 @@ class StarImapWrapper:
 
     A kwargs dict is passed to this wrapper, which then calls the underlying function
     with the unwrapped kwargs.
+
+    This code is based on rslearn.utils.mp but for star_imap instead of star_imap_unordered.
     """
 
     def __init__(self, fn: Callable[..., Any]):
@@ -161,7 +163,8 @@ def star_imap(
         kwargs_list: list of kwargs dicts to pass to the function.
 
     Returns:
-        generator for outputs from the function in arbitrary order.
+        generator for outputs from the function. The outputs will be in order corresponding
+            to kwargs_list.
     """
     return p.imap(StarImapWrapper(fn), kwargs_list)
 
