@@ -60,7 +60,7 @@ def make_tiles(workers: int, in_fname: str, gcs_ds_root: str) -> None:
 
         # Apply tippecanoe to convert the GeoJSON into a set of vector tiles.
         local_tile_dir = os.path.join(tmp_dir, "tiles")
-        subprocess.call(
+        subprocess.check_call(
             [
                 "tippecanoe",
                 # Set maximum zoom level to 12.
