@@ -1,11 +1,19 @@
 ## OlmoEarth Projects
 
-This repository contains configuration files, model checkpoint references, and
-documentation for several remote sensing models built on top of OlmoEarth at Ai2. It
-also includes tooling and tutorials for building new models using various components of
-OlmoEarth.
+Configuration, platform tooling, and tutorials for applying
+[OlmoEarth](https://github.com/allenai/olmoearth_pretrain/) to remote sensing
+tasks.
 
-The models available here are:
+### What's in this repo
+
+| Directory | Description |
+|-----------|-------------|
+| `olmoearth_projects/` | Python package with platform tooling: olmoearth_run integration, training utilities, and label quality tools. |
+| `olmoearth_run_data/` | Per-project model configurations (`dataset.json`, `model.yaml`, `olmoearth_run.yaml`). |
+| `tutorials/` | Self-contained tutorials for getting started with OlmoEarth. Each tutorial has its own dependencies and README. |
+| `docs/` | Per-model documentation for the fine-tuned models available in this repository. |
+
+### Available Models
 
 - [Live Fuel Moisture Content Mapping](docs/lfmc.md)
 - [Forest Loss Driver Classification](docs/forest_loss_driver.md)
@@ -13,14 +21,18 @@ The models available here are:
 - [Ecosystem Type Mapping](docs/ecosystem_type_mapping.md)
 - [Land Use / Land Cover Mapping in Southern Kenya](docs/awf.md)
 
-The links above provide more details about the training data and intended use case for
-each model.
+The links above provide more details about the training data and intended use
+case for each model.
 
-Here are tutorials for applying OlmoEarth for new tasks:
+### Tutorials
 
-- [Fine-tuning OlmoEarth for Segmentation](docs/tutorials/FinetuneOlmoEarthSegmentation.md)
+See the `tutorials/` directory for self-contained tutorials hosted in this
+repo. Additional tutorials are available in rslearn:
+
 - [Computing Embeddings using OlmoEarth](https://github.com/allenai/rslearn/blob/master/docs/examples/OlmoEarthEmbeddings.md)
 - [Fine-tuning OlmoEarth in rslearn](https://github.com/allenai/rslearn/blob/master/docs/examples/FinetuneOlmoEarth.md)
+
+### OlmoEarth Ecosystem
 
 These tutorials use all or a subset of the components of OlmoEarth:
 
@@ -45,6 +57,9 @@ cd olmoearth_projects
 uv sync
 source .venv/bin/activate
 ```
+
+Tutorials manage their own dependencies separately; see each tutorial's README
+for setup instructions.
 
 ## Applying Existing Models
 
