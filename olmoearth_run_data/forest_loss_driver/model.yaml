@@ -1,5 +1,4 @@
 model:
-#  class_path: olmoearth_projects.train.classification_confusion_matrix.CMLightningModule
   class_path: rslearn.train.lightning_module.RslearnLightningModule
   init_args:
     model:
@@ -62,6 +61,7 @@ data:
           average: "micro"
         prob_property: "probs"
         skip_unknown_categories: true
+        enable_confusion_matrix: true
     batch_size: 8
     num_workers: ${NUM_WORKERS}
     default_config:
@@ -114,15 +114,15 @@ trainer:
         module_selector: ["model", "encoder", 0, "encoder", "model"]
         unfreeze_at_epoch: 20
         unfreeze_lr_factor: 10
-    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+    - class_path: rslearn.train.callbacks.checkpointing.BestLastCheckpoint
       init_args:
         dirpath: ${TRAINER_DATA_PATH}
-        save_top_k: 1
-        save_last: true
         monitor: val_accuracy
         mode: max
     - class_path: rslearn.train.prediction_writer.RslearnWriter
       init_args:
         path: ${DATASET_PATH}
         output_layer: ${PREDICTION_OUTPUT_LAYER}
+# project_name: 20260401_forest_loss_driver_peru_phase2
+# run_name: config.yaml_airstripfix_02
 # Not used: ${EXTRA_FILES_PATH}
