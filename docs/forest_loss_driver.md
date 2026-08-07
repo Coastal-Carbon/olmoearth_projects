@@ -83,6 +83,38 @@ If you open the `prediction_request_geometry.geojson` in qgis, you should see se
 small polygons. The model will be applied on a 128x128 pixel window centered at each of
 these polygons.
 
+### Historical and multi-region extraction
+
+`extract_alerts` exposes a few options that are useful when building a larger sample,
+e.g. a random sample of historical forest loss events across several countries:
+
+- `countries`: limit alerts to a list of two-letter country codes (requires the Natural
+  Earth `ne_10m_admin_0_countries.shp` shapefile in the working directory).
+- `prediction_utc_time`: set the reference time into the past to extract historical
+  alerts (the window is the `days` preceding this time).
+- `max_number_of_events`: randomly sample at most this many events.
+- `slice_days`: split the time window into consecutive slices of this many days and
+  extract events independently within each slice. Because the GLAD date raster stores a
+  single date per pixel, extracting over a long multi-year window at once can merge
+  spatially-adjacent forest loss from different time periods into a single connected
+  component. Slicing keeps these separate and gives more even temporal coverage. When
+  `slice_days` is set, `max_number_of_events` becomes a per-slice cap. Note that a loss
+  event straddling a slice boundary is split into two components.
+
+For example, to sample up to 2000 events per quarter from each GLAD tile across Peru,
+Bolivia, and Ecuador for Jan 2022 - Dec 2025:
+
+```
+python -m olmoearth_projects.main projects.forest_loss_driver extract_alerts \
+  --extract_alerts_args.gcs_tiff_filenames+=080W_20S_070W_10S.tif \
+  --extract_alerts_args.countries+=PE --extract_alerts_args.countries+=BO --extract_alerts_args.countries+=EC \
+  --extract_alerts_args.prediction_utc_time=2025-12-31T00:00:00+00:00 \
+  --extract_alerts_args.days=1460 \
+  --extract_alerts_args.slice_days=90 \
+  --extract_alerts_args.max_number_of_events=2000 \
+  --extract_alerts_args.out_fname='prediction_request_geometry.geojson'
+```
+
 To run inference:
 
 ```

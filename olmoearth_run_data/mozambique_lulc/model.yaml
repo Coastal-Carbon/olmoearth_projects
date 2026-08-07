@@ -7,14 +7,14 @@ model:
         encoder:
           - class_path: rslearn.models.olmoearth_pretrain.model.OlmoEarth
             init_args:
-              checkpoint_path: ${EXTRA_FILES_PATH}
-              selector: ["encoder"]
-              patch_size: 1
+              model_path: ${EXTRA_FILES_PATH}
+              embedding_size: 768
+              patch_size: 4
         decoders:
           segment:
             - class_path: rslearn.models.upsample.Upsample
               init_args:
-                scale_factor: 1
+                scale_factor: 4
             - class_path: rslearn.models.conv.Conv
               init_args:
                 in_channels: 768
@@ -22,10 +22,6 @@ model:
                 kernel_size: 1
                 activation:
                   class_path: torch.nn.Identity
-            - class_path: rslearn.models.pick_features.PickFeatures
-              init_args:
-                indexes: [0]
-                collapse: true
             - class_path: rslearn.train.tasks.segmentation.SegmentationHead
     lr: 0.0001
     plateau: true
@@ -193,7 +189,7 @@ data:
         input_mapping:
           segment:
             label: "targets"
-    batch_size: 2
+    batch_size: 64
     num_workers: ${NUM_WORKERS}
     default_config:
       transforms:

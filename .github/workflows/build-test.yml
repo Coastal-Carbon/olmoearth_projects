@@ -96,13 +96,13 @@ jobs:
         with:
           credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
 
-      #- name: Run unit tests
-      #  run: |
-      #    echo "Executing unit tests"
-      #    docker run --rm \
-      #      -e CI="true" \
-      #      ${{ needs.build.outputs.ghcr_docker_image }} \
-      #      pytest tests/unit -vv
+      - name: Run unit tests
+        run: |
+         echo "Executing unit tests"
+         docker run --rm \
+           -e CI="true" \
+           ${{ needs.build.outputs.ghcr_docker_image }} \
+           pytest tests/unit -vv
 
       - name: Run integration tests
         run: |
@@ -111,6 +111,8 @@ jobs:
             -e CI="true" \
             -v ${{env.GOOGLE_GHA_CREDS_PATH}}:/tmp/gcp-credentials.json:ro \
             -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json \
+            -e OEDATASETS_API_URL="${{ secrets.OEDATASETS_API_URL }}" \
+            -e DATASETS_API_TOKEN="${{ secrets.DATASETS_API_TOKEN }}" \
             ${{ needs.build.outputs.ghcr_docker_image }} \
             pytest tests/integration -vv --forked
 
